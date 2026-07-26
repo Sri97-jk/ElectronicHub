@@ -1,0 +1,122 @@
+{
+  "project_name": "ElectronicHub",
+  "theme_strategy": "dark",
+  "archetype": "ARCHETYPE 7: ELECTRIC & NEON (Future, Speed, Disruption) mixed with THE SWISS GRID",
+  "typography": {
+    "headings": {
+      "font": "Cabinet Grotesk",
+      "classes": "font-black tracking-tighter"
+    },
+    "body": {
+      "font": "IBM Plex Sans",
+      "classes": "font-normal leading-relaxed"
+    },
+    "mono_labels": {
+      "font": "JetBrains Mono",
+      "classes": "font-mono text-xs uppercase tracking-[0.2em]"
+    },
+    "hierarchy_rules": "H1 max size is text-6xl. Do not jump more than 2 tailwind scale steps between heading and subheading. Use JetBrains Mono for all hardware specs, voltages, and datasheet links."
+  },
+  "colors": {
+    "background": "#050A0F",
+    "surface": "#0A1017",
+    "primary_accent": "#00FF66",
+    "secondary_accent": "#0066FF",
+    "text_primary": "#F8FAFC",
+    "text_muted": "#94A3B8",
+    "border": "rgba(255, 255, 255, 0.1)",
+    "rules": "Never use pure black. Tint background towards deep blue to match logo. Use #00FF66 exclusively for primary CTAs and active states. Maintain 4.5:1 contrast for text."
+  },
+  "visual_enhancers": {
+    "surfaces": "Use GRID BORDERS (The 'Technical' Look). Expose the skeleton. Container uses border-collapse style layout. Items have border-r border-b border-border/40. No soft shadows. Sharp 1px borders.",
+    "hover_states": "Implement 'The Tracing Beam' for featured product cards. Glow effect on hover with blur-md behind the primary accent color.",
+    "header": "Crystal Glassmorphism: backdrop-blur-xl bg-[#050A0F]/70 with a 1px bottom border border-white/10. NO pure transparent backgrounds.",
+    "textures": "Subtle noise overlay (opacity 2-3%) across the entire background to kill digital flatness and simulate raw hardware feel."
+  },
+  "grids_layouts": {
+    "spacing_scale": "p-1, p-2, p-4, p-6, p-8, p-12, p-16, p-24. Generous padding. Use p-8 for standard component internal padding.",
+    "bento_grid": "Homepage categories and featured items use MODE A: The 'Tetris' Grid. gap-8. Mix col-span-8 row-span-2 with smaller supporting blocks. Leave empty cells for negative space.",
+    "dashboard_grid": "Admin panel uses MODE B: High Density Grid. grid-cols-1 md:grid-cols-4. gap-4. Single metric summaries use col-span-1. Main charts use col-span-3.",
+    "alignment": "Strict left alignment for specs, data tables, and product descriptions. Center align ONLY massive hero text if absolutely necessary for balance."
+  },
+  "components": {
+    "buttons": "Sharp edges (rounded-none). High contrast. Primary buttons: bg-[#00FF66] text-black hover:bg-[#00CC52]. Ghost buttons: border border-white/20 hover:border-white/50.",
+    "cards": "Cardless aesthetic. Flat rectangular shapes with 1px border. No shadows. Technical blueprint vibe.",
+    "datasheet_table": "Dense, monospace font (JetBrains Mono), subtle zebra striping with bg-white/5. Hover row highlight.",
+    "forms_inputs": "Shadcn components heavily customized to be flat, square, with 1px borders. Focus state: ring-1 ring-[#00FF66] ring-offset-0."
+  },
+  "motion": {
+    "micro_interactions": "Hover states must have transition: transform 0.2s ease, opacity 0.2s ease. NO universal 'transition-all'.",
+    "page_load": "Staggered entrance for product grids and dashboard widgets (framer-motion).",
+    "reduced_motion": "Respect prefers-reduced-motion CSS media query."
+  },
+  "accessibility": {
+    "contrast": "APCA/WCAG AA compliant. Text over images must have background overlay (bg-black/50 max) or text-shadow.",
+    "focus": "Clear focus rings on all interactive elements.",
+    "test_attributes": "All interactive elements MUST have data-testid attributes (e.g., data-testid='add-to-cart-button', data-testid='checkout-submit')."
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://images.pexels.com/photos/39290/mother-board-electronics-computer-board-39290.jpeg",
+        "category": "Hero Background / Featured Category",
+        "description": "Macro shot of integrated circuits. Use with a dark overlay (bg-black/50) for the main landing hero."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1592659762303-90081d34b277",
+        "category": "Category Thumbnail: Microcontrollers",
+        "description": "Dark blue circuit board."
+      },
+      {
+        "url": "https://images.pexels.com/photos/3913012/pexels-photo-3913012.jpeg",
+        "category": "About Us / Community / Robotics Teams",
+        "description": "Engineer in laboratory with robotic equipment."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1517420704952-d9f39e95b43e",
+        "category": "Product Showcase / Kits & Bundles",
+        "description": "Electronic circuit boards near tester, wires, workspace."
+      },
+      {
+        "url": "/logo.png",
+        "category": "Brand Logo",
+        "description": "ElectronicHub blue-and-green circuit-styled globe with robotic arm. MUST USE this exact path."
+      }
+    ],
+    "icons": "Use Phosphor Icons (@phosphor-icons/react) for high-end technical UI. Use Duotone weight for marketing, Regular for dense admin."
+  },
+  "3d_libraries": {
+    "recommendation": "Use framer-motion for smooth 2D layout animations. For product showcases, if a 3D view is added later, use React Three Fiber. For this MVP, stick to high-quality images and crisp CSS grids to maintain blueprint precision."
+  },
+  "instructions_to_main_agent": [
+    "This project uses .js/.jsx files (not .tsx). Adjust all component installations and imports accordingly.",
+    "Install fonts: Cabinet Grotesk, IBM Plex Sans, JetBrains Mono.",
+    "Install Phosphor Icons: yarn add @phosphor-icons/react",
+    "Install date tools & framer-motion: yarn add date-fns framer-motion",
+    "Install sonner for toasts: yarn add sonner",
+    "Use Shadcn UI for dropdowns, selects, tabs, and tables. Strip rounded corners to 'rounded-none' or 'rounded-sm' to maintain the technical hardware feel.",
+    "Build the storefront and admin panel within the same React app using conditional routing or sub-paths (/admin).",
+    "For the product detail page, create a 'Specs' tab and a 'Datasheet' download button. Datasheet should look highly technical.",
+    "For filtering in the catalog, use a left-sidebar with Checkboxes for Voltage, Interface, Brand.",
+    "Ensure 'data-testid' is added to all buttons, form inputs, and major links for testing."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) for sticky navs.",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style. (For this app, use sharp edges).",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, custom cursors, selection states, and loading animations separate good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Create new components that match the style and conventions of existing components when needed.",
+    "Examine existing components to understand the project's component patterns before creating new ones.",
+    "Use 'sonner' for toasts. Sonner components are located in /app/src/components/ui/sonner.js or .jsx."
+  ]
+}
