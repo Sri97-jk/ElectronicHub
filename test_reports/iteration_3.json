@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 3 focus: Project Kits (/api/projects) and file uploads (image/datasheet). Added /app/backend/tests/test_projects_and_uploads.py with 11 tests — ALL 11 PASSED. Verified 4 seeded projects (line-follower-robot, weather-station, obstacle-avoider, motion-alert-cam) with correct summary fields; detail endpoint returns items[] with product+quantity+unit_price+line_total plus total_price and description/learn; 404 on unknown slug; guest add-to-cart returns cart_id and populates GET /api/cart?cart_id=…; authenticated add returns cart_id=null and populates user cart; repeat add INCREMENTS quantity (verified — no duplicate rows). Uploads: POST /api/uploads/image and /api/uploads/datasheet return {path,url}, url starts with /api/files/, download via URL returns exact bytes with correct content-type (PNG magic and %PDF- verified); both endpoints reject unauthenticated (403) and customer token (403); admin product PUT persists datasheet_url and images fields. Full regression: 50 tests run, 48 passed, 2 flaky (pre-existing shipped/delivered idempotency assertions rely on tail-log line-count with mismatched window sizes 200 vs 250 — DB flag shipped_email_sent/delivered_email_sent verified true and backend logs show exactly one email per state per order, so no real duplicate). Frontend: /projects renders 4 project cards with correct data-testid; nav-projects link present in header; click → /projects/line-follower-robot with 5 BOM items; ADD ALL TO CART fires toast 'All 5 parts added to cart' and navigates to /cart which shows all 5 items and correct totals. Admin panel: p-upload-images and p-upload-datasheet inputs present; uploading a PNG populated the Image URLs field with /api/files/electronichub/products/<uuid>.png, uploading a PDF fired 'Datasheet uploaded' toast and a VIEW link appeared next to the datasheet field.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "N/A (test-suite)", "issue": "test_recommendations_and_emails.py::test_shipped_email_console_log & test_delivered_email_console_log — flaky assertion. before_count uses last 200 log lines, after_count uses last 250 lines; the wider window can pick up an older 'Shipped ·' / 'Delivered ·' line and produce a false positive. DB flag verification (order.shipped_email_sent / delivered_email_sent True after first call) proves idempotency actually works. Fix the test window sizes to be equal (both 250 or count within a fixed timestamp window)."},
+      {"endpoint": "emails.py", "issue": "RESEND_API_KEY is set in backend/.env but backend logs still show [EMAIL:CONSOLE] rather than [EMAIL:RESEND]. Either the module import failed silently at startup or the log line 'Resend email provider active' is being emitted before the root logger is configured (logger.info at import time). Not a functional bug for our test suite but worth verifying real Resend delivery is actually happening in production."},
+      {"endpoint": "POST /api/admin/orders/{id}/status", "issue": "Still accepts any string as status (no enum validation) — carried over from iter 1 & 2 code review."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Project detail BOM & Cart page", "issues": ["Product thumbnails on BOM/cart rows use unrelated stock photos of people/objects rather than actual component photos. This is seeded product image data, not a rendering bug, but it makes the storefront feel unprofessional. Suggest curating proper product images (or use datasheet-adjacent placeholder icons) for at least the parts referenced by project kits."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_recommendations_and_emails.py",
+    "/app/backend/tests/test_projects_and_uploads.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Fix flaky idempotency assertions in test_recommendations_and_emails.py — use equal tail-log window sizes or a fixed timestamp bound.",
+    "(Optional) Verify Resend integration is actually sending. Backend logs show only [EMAIL:CONSOLE] despite RESEND_API_KEY being set — check whether `import resend` succeeded and _resend was assigned; consider printing status at /api/health or similar.",
+    "(Optional) Replace or curate proper product images for parts referenced by project kits (Arduino Uno, L298N, 18650 battery, breadboard, jumper wires currently render unrelated stock photos).",
+    "(Nit) server.py is now 1090 lines — split into routers (products, cart, projects, uploads, admin, emails).",
+    "(Nit) Add status-enum validation on /api/admin/orders/{id}/status."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew from 911 → 1090 lines with projects + uploads. Split into routers (products, cart, checkout, projects, uploads, admin, emails) now — every new iteration makes the merge conflict surface larger.",
+    "admin_update_order still lacks status-enum validation; e.g. status='shipp3d' silently stored.",
+    "/api/uploads/image and /api/uploads/datasheet accept any file extension/content-type. Should validate content_type against a whitelist (image/png|jpg|jpeg|webp for images; application/pdf for datasheets) and enforce a max size to prevent DoS via giant uploads.",
+    "GET /api/files/{path} has no auth and no rate limiting — anyone who guesses a UUID path can pull the file. Consider signed URLs or restricting to files linked from active products only. Also no content sniffing/validation on egress.",
+    "add_project_to_cart's decision to mark a part as 'unavailable' when stock_qty < required is silent from the user's POV — the frontend toast only says '{n} out of stock' without naming the missing parts. Include unavailable SKUs list in the toast so shoppers know what they still need to buy.",
+    "_resolve_project N+1 queries products by SKU sequentially (one find_one per part). For 4 projects × 5 parts on the /api/projects list endpoint that's ~20 queries. Consider a single $in query per project or a batched cache.",
+    "emails.py imports resend at module top under `if RESEND_API_KEY`. If the import throws, we silently log to logger.warning but the logger has no handler configured yet at import time. Move the resend init into the app startup event so warnings actually make it to /var/log/supervisor/backend.err.log."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_projects_and_uploads.py"
+  ],
+  "success_rate": {"backend": "96% (48/50 — 2 flaky pre-existing tests)", "frontend": "100%"},
+  "test_credentials": "Admin admin@electronichub.io/Admin@12345, Customer customer@electronichub.io/Customer@12345",
+  "seed_data_creation": "New TEST_ prefixed admin products created and deleted within tests; guest cart_ids created for add-to-cart flows (orphaned in DB but harmless).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test suite lives at /app/backend/tests/ — 3 files, 50 tests total. Run: pytest /app/backend/tests/ -v. The 2 pre-existing email-idempotency test failures are due to unequal tail-log window sizes (200 vs 250 lines) in test_recommendations_and_emails.py — real idempotency works (DB flags + log inspection confirmed). If Main agent fixes those windows to be equal, expect 50/50.",
+  "rca of the issue": "test_shipped_email_console_log / test_delivered_email_console_log flakiness — RCA: before_count = last-200-lines.count('Shipped ·'); after_count = last-250-lines.count('Shipped ·'). The wider after-window includes older log lines that weren't in the before-window, so counts drift upward as backend accumulates emails from other tests running in parallel. Fix: use the same window size for both snapshots, or capture the exact log line count before and after with a monotonic offset."
+}

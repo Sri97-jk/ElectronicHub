@@ -619,6 +619,20 @@ async def upload_image(file: UploadFile = File(...), user=Depends(require_admin)
     })
     return {"path": result["path"], "url": f"/api/files/{result['path']}"}
 
+@api_router.post("/uploads/datasheet")
+async def upload_datasheet(file: UploadFile = File(...), user=Depends(require_admin)):
+    ext = (file.filename or "file").split(".")[-1].lower()
+    path = f"{APP_NAME}/datasheets/{uuid.uuid4()}.{ext}"
+    data = await file.read()
+    result = put_object(path, data, file.content_type or "application/pdf")
+    await db.files.insert_one({
+        "id": str(uuid.uuid4()), "storage_path": result["path"],
+        "original_filename": file.filename, "content_type": file.content_type or "application/pdf",
+        "size": result.get("size", len(data)), "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"path": result["path"], "url": f"/api/files/{result['path']}"}
+
 @api_router.get("/files/{path:path}")
 async def download_file(path: str):
     rec = await db.files.find_one({"storage_path": path, "is_deleted": False})
@@ -709,6 +723,171 @@ async def admin_create_coupon(data: CouponIn, user=Depends(require_admin)):
 @api_router.get("/admin/coupons")
 async def admin_list_coupons(user=Depends(require_admin)):
     return await db.coupons.find({}, {"_id": 0}).to_list(200)
+
+# --- Project Kits (curated maker projects that add all required parts to cart)
+async def _resolve_project(proj: dict):
+    """Enrich a project with full product data + calculated total price."""
+    items = []
+    total = 0
+    missing = []
+    for entry in proj.get("parts", []):
+        sku = entry["sku"]
+        qty = entry.get("quantity", 1)
+        p = await db.products.find_one({"sku": sku, "is_active": True}, {"_id": 0})
+        if not p:
+            missing.append(sku)
+            continue
+        price = p.get("discount_price") or p["price"]
+        line_total = price * qty
+        total += line_total
+        items.append({"product": p, "quantity": qty, "unit_price": price, "line_total": line_total})
+    proj_copy = {k: v for k, v in proj.items() if k != "_id"}
+    proj_copy["items"] = items
+    proj_copy["total_price"] = round(total, 2)
+    proj_copy["parts_missing"] = missing
+    return proj_copy
+
+
+@api_router.get("/projects")
+async def list_projects():
+    projs = await db.projects.find({"is_active": True}, {"_id": 0}).sort([("sort_order", 1)]).to_list(100)
+    result = []
+    for p in projs:
+        enriched = await _resolve_project(p)
+        # only send summary in the list view
+        result.append({
+            "id": enriched["id"], "slug": enriched["slug"], "name": enriched["name"],
+            "tagline": enriched["tagline"], "difficulty": enriched["difficulty"],
+            "duration": enriched["duration"], "image": enriched.get("image"),
+            "total_price": enriched["total_price"],
+            "parts_count": sum(it["quantity"] for it in enriched["items"]),
+        })
+    return result
+
+
+@api_router.get("/projects/{slug}")
+async def get_project(slug: str):
+    proj = await db.projects.find_one({"slug": slug, "is_active": True}, {"_id": 0})
+    if not proj:
+        raise HTTPException(404, "Project not found")
+    return await _resolve_project(proj)
+
+
+@api_router.post("/projects/{slug}/add-to-cart")
+async def add_project_to_cart(slug: str, user=Depends(get_optional_user), cart_id: Optional[str] = None):
+    proj = await db.projects.find_one({"slug": slug, "is_active": True}, {"_id": 0})
+    if not proj:
+        raise HTTPException(404, "Project not found")
+    if not user and not cart_id:
+        cart_id = str(uuid.uuid4())
+    added = []
+    unavailable = []
+    for entry in proj.get("parts", []):
+        p = await db.products.find_one({"sku": entry["sku"], "is_active": True}, {"_id": 0})
+        if not p:
+            unavailable.append(entry["sku"]); continue
+        if p.get("stock_qty", 0) < entry["quantity"]:
+            unavailable.append(entry["sku"]); continue
+        key = {"user_id": user["id"], "product_id": p["id"]} if user else {"cart_id": cart_id, "product_id": p["id"]}
+        existing = await db.cart_items.find_one(key)
+        if existing:
+            await db.cart_items.update_one(key, {"$inc": {"quantity": entry["quantity"]}})
+        else:
+            await db.cart_items.insert_one({**key, "id": str(uuid.uuid4()),
+                "quantity": entry["quantity"],
+                "created_at": datetime.now(timezone.utc).isoformat()})
+        added.append({"sku": p["sku"], "name": p["name"], "quantity": entry["quantity"]})
+    return {"added": added, "unavailable": unavailable, "cart_id": cart_id if not user else None}
+
+
+async def seed_projects():
+    if await db.projects.count_documents({}) > 0:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    projects = [
+        {
+            "slug": "line-follower-robot",
+            "name": "Line Follower Robot",
+            "tagline": "Your first autonomous bot — follows a black line on white surface using IR sensors.",
+            "difficulty": "Beginner",
+            "duration": "3–4 hours",
+            "image": "https://images.pexels.com/photos/3913012/pexels-photo-3913012.jpeg?w=1200",
+            "description": "Build a classic line-following robot using an Arduino, two motors, IR sensors and an L298N motor driver. Great intro to closed-loop control, PWM, and digital sensor reading.",
+            "learn": ["Digital I/O and interrupts", "PWM motor control", "Simple closed-loop control"],
+            "parts": [
+                {"sku": "MCU-UNO-R3", "quantity": 1},
+                {"sku": "ROB-L298N", "quantity": 1},
+                {"sku": "ROB-SG90", "quantity": 0},  # not needed but shows compatibility
+                {"sku": "PWR-18650", "quantity": 2},
+                {"sku": "TOO-BB830", "quantity": 1},
+                {"sku": "TOO-JW40", "quantity": 1},
+            ],
+            "is_active": True, "sort_order": 1, "created_at": now,
+        },
+        {
+            "slug": "weather-station",
+            "name": "IoT Weather Station",
+            "tagline": "WiFi-connected temperature, humidity and motion logger that pushes data to your phone.",
+            "difficulty": "Intermediate",
+            "duration": "5–6 hours",
+            "image": "https://images.unsplash.com/photo-1580983230712-71cf10154a68?w=1200",
+            "description": "Combine an ESP32 with DHT22 and PIR sensors to build a full-fledged environmental logger. Data can be sent to a dashboard via MQTT or REST.",
+            "learn": ["ESP32 WiFi & HTTP client", "I²C / 1-Wire sensor protocols", "Deep sleep power management"],
+            "parts": [
+                {"sku": "MCU-ESP32", "quantity": 1},
+                {"sku": "SEN-DHT22", "quantity": 1},
+                {"sku": "SEN-PIR", "quantity": 1},
+                {"sku": "PWR-LM2596", "quantity": 1},
+                {"sku": "TOO-BB830", "quantity": 1},
+                {"sku": "TOO-JW40", "quantity": 1},
+            ],
+            "is_active": True, "sort_order": 2, "created_at": now,
+        },
+        {
+            "slug": "obstacle-avoider",
+            "name": "Obstacle-Avoiding Robot",
+            "tagline": "A rover that senses walls with ultrasonic and steers around them autonomously.",
+            "difficulty": "Beginner",
+            "duration": "4–5 hours",
+            "image": "https://images.unsplash.com/photo-1517420704952-d9f39e95b43e?w=1200",
+            "description": "Mount an HC-SR04 on a servo to sweep for obstacles, then use an L298N to control drive motors. A perfect follow-up after the Line Follower.",
+            "learn": ["Servo sweep + ultrasonic sensing", "State-machine logic", "Motor kinematics"],
+            "parts": [
+                {"sku": "MCU-UNO-R3", "quantity": 1},
+                {"sku": "SEN-HCSR04", "quantity": 1},
+                {"sku": "ROB-SG90", "quantity": 1},
+                {"sku": "ROB-L298N", "quantity": 1},
+                {"sku": "PWR-18650", "quantity": 2},
+                {"sku": "TOO-JW40", "quantity": 1},
+            ],
+            "is_active": True, "sort_order": 3, "created_at": now,
+        },
+        {
+            "slug": "motion-alert-cam",
+            "name": "Motion-Alert Doorbell",
+            "tagline": "PIR-triggered alert that fires a wireless signal when someone approaches your door.",
+            "difficulty": "Intermediate",
+            "duration": "3–4 hours",
+            "image": "https://images.unsplash.com/photo-1592659762303-90081d34b277?w=1200",
+            "description": "Combine a PIR motion sensor with an ESP32 and an nRF24 module to build a battery-powered wireless doorbell / motion notifier.",
+            "learn": ["Interrupt-driven sleep + wake", "SPI communication", "Wireless protocols"],
+            "parts": [
+                {"sku": "MCU-ESP32", "quantity": 1},
+                {"sku": "SEN-PIR", "quantity": 1},
+                {"sku": "CON-NRF24", "quantity": 2},
+                {"sku": "PWR-18650", "quantity": 1},
+                {"sku": "TOO-BB830", "quantity": 1},
+                {"sku": "TOO-JW40", "quantity": 1},
+            ],
+            "is_active": True, "sort_order": 4, "created_at": now,
+        },
+    ]
+    for p in projects:
+        p["id"] = str(uuid.uuid4())
+        # Remove zero-quantity parts (they're informational, not required)
+        p["parts"] = [x for x in p["parts"] if x.get("quantity", 0) > 0]
+    await db.projects.insert_many(projects)
+
 
 # --- Seed
 async def seed_data():
@@ -889,6 +1068,7 @@ async def startup():
     except Exception as e:
         logging.warning(f"Storage init failed (uploads disabled): {e}")
     await seed_data()
+    await seed_projects()
 
 @api_router.get("/")
 async def root():

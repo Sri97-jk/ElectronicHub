@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Cpu, Robot, WifiHigh, Package, Wrench, BatteryCharging, Waveform, HardDrives } from "@phosphor-icons/react";
+import { ArrowRight, Cpu, Robot, WifiHigh, Package, Wrench, BatteryCharging, Waveform, HardDrives, Sparkle } from "@phosphor-icons/react";
 import api from "../lib/api";
 import ProductCard from "../components/ProductCard";
 
@@ -14,10 +14,12 @@ const ICONS = {
 export default function Home() {
   const [featured, setFeatured] = useState([]);
   const [cats, setCats] = useState([]);
+  const [projects, setProjects] = useState([]);
 
   useEffect(() => {
     api.get("/products", { params: { featured: true, limit: 8 }}).then(r => setFeatured(r.data.items));
     api.get("/categories").then(r => setCats(r.data));
+    api.get("/projects").then(r => setProjects(r.data.slice(0, 3))).catch(() => {});
   }, []);
 
   return (
@@ -100,13 +102,51 @@ export default function Home() {
         </div>
       </section>
 
+      {/* PROJECT KITS */}
+      {projects.length > 0 && (
+        <section className="max-w-7xl mx-auto px-6 py-20">
+          <div className="flex items-end justify-between mb-10">
+            <div>
+              <div className="section-label mb-3">03 · Ready-to-build</div>
+              <h2 className="font-display text-4xl md:text-5xl text-slate-900 flex items-center gap-3">
+                Project kits <Sparkle size={32} weight="fill" className="text-blue-700" />
+              </h2>
+              <p className="text-slate-500 mt-3 max-w-xl">Pick a project. Every required part added in one click.</p>
+            </div>
+            <Link to="/projects" className="hidden md:flex items-center gap-2 font-mono-tech text-xs uppercase tracking-widest text-slate-500 hover:text-slate-900">
+              All projects <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {projects.map((p) => (
+              <Link key={p.id} to={`/projects/${p.slug}`} className="tech-card block group" data-testid={`home-project-${p.slug}`}>
+                <div className="aspect-video bg-slate-50 overflow-hidden">
+                  {p.image && <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />}
+                </div>
+                <div className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="tag-pill">{p.difficulty}</span>
+                    <span className="tag-pill">{p.duration}</span>
+                  </div>
+                  <h3 className="font-display text-xl text-slate-900 group-hover:text-blue-700 mb-2">{p.name}</h3>
+                  <div className="flex items-center justify-between">
+                    <span className="font-display text-2xl text-blue-700">₹{p.total_price.toLocaleString()}</span>
+                    <ArrowRight size={16} className="text-slate-500 group-hover:text-blue-700" />
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* CTA STRIP */}
       <section className="max-w-7xl mx-auto px-6 my-20">
         <div className="border border-slate-200 p-12 md:p-16 bg-slate-50 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-100 blur-3xl opacity-60" />
-          <div className="section-label mb-4 relative">03 · Bundle & Save</div>
+          <div className="section-label mb-4 relative">04 · Bundle & Save</div>
           <h3 className="font-display text-3xl md:text-5xl text-slate-900 max-w-2xl relative">
-            Save 15% with code <span className="text-blue-700 font-mono-tech">WELCOME10</span> on your first order over ₹500.
+            Save 10% with code <span className="text-blue-700 font-mono-tech">WELCOME10</span> on your first order over ₹500.
           </h3>
           <Link to="/catalog" data-testid="cta-catalog-btn" className="btn-primary-neo mt-8 inline-flex items-center gap-2 relative">
             Start Shopping <ArrowRight size={16} />

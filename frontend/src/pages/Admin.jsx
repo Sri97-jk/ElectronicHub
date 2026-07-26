@@ -100,12 +100,49 @@ function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const empty = { sku: "", name: "", category: "sensors", brand: "", price: 0, discount_price: null, stock_qty: 0,
-    description: "", voltage: "", interface: "", images: [], is_active: true, is_featured: false, specs: {} };
+    description: "", voltage: "", interface: "", images: [], datasheet_url: "", is_active: true, is_featured: false, specs: {} };
   const [form, setForm] = useState(empty);
 
   const load = () => api.get("/products", { params: { limit: 200 }}).then(r => setProducts(r.data.items));
   useEffect(() => { load(); }, []);
+
+  const uploadFile = async (file, endpoint) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    setUploading(true);
+    try {
+      const r = await api.post(endpoint, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      return r.data.url;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onImageUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    try {
+      const urls = [];
+      for (const f of files) urls.push(await uploadFile(f, "/uploads/image"));
+      const current = typeof form.images === "string"
+        ? form.images.split(",").map(s => s.trim()).filter(Boolean)
+        : (form.images || []);
+      setForm({ ...form, images: [...current, ...urls].join(", ") });
+      toast.success(`${files.length} image(s) uploaded`);
+    } catch (err) { toast.error("Image upload failed"); }
+  };
+
+  const onDatasheetUpload = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try {
+      const url = await uploadFile(f, "/uploads/datasheet");
+      setForm({ ...form, datasheet_url: url });
+      toast.success("Datasheet uploaded");
+    } catch (err) { toast.error("Datasheet upload failed"); }
+  };
 
   const save = async () => {
     try {
@@ -128,7 +165,7 @@ function AdminProducts() {
   };
   const edit = (p) => {
     setEditing(p.id);
-    setForm({ ...p, images: (p.images || []).join(", "), discount_price: p.discount_price || "" });
+    setForm({ ...p, images: (p.images || []).join(", "), discount_price: p.discount_price || "", datasheet_url: p.datasheet_url || "" });
     setShowForm(true);
   };
 
@@ -158,6 +195,24 @@ function AdminProducts() {
             <Inp l="Voltage" v={form.voltage || ""} on={v=>setForm({...form,voltage:v})} tid="p-voltage" />
             <Inp l="Interface" v={form.interface || ""} on={v=>setForm({...form,interface:v})} tid="p-interface" />
             <Inp l="Image URLs (comma separated)" v={form.images} on={v=>setForm({...form,images:v})} tid="p-images" cls="md:col-span-2" />
+            <div className="md:col-span-2 grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono-tech uppercase text-slate-500 mb-1">Upload images (PNG/JPG)</label>
+                <input data-testid="p-upload-images" type="file" accept="image/*" multiple onChange={onImageUpload}
+                  className="w-full px-3 py-2 text-sm cursor-pointer" disabled={uploading} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono-tech uppercase text-slate-500 mb-1">Datasheet PDF</label>
+                <div className="flex gap-2 items-center">
+                  <input data-testid="p-upload-datasheet" type="file" accept="application/pdf" onChange={onDatasheetUpload}
+                    className="flex-1 px-3 py-2 text-sm cursor-pointer" disabled={uploading} />
+                  {form.datasheet_url && (
+                    <a href={form.datasheet_url} target="_blank" rel="noreferrer"
+                       className="text-blue-700 hover:underline font-mono-tech text-xs uppercase">View</a>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="md:col-span-2">
               <label className="block text-[10px] font-mono-tech uppercase text-slate-500 mb-1">Description</label>
               <textarea data-testid="p-desc" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows={3} className="w-full px-3 py-2" />

@@ -25,6 +25,7 @@ export default function Header() {
 
         <nav className="hidden lg:flex items-center gap-6 font-mono-tech text-xs uppercase tracking-widest text-slate-700">
           <Link to="/catalog" data-testid="nav-catalog" className="hover:text-blue-700 transition-colors">Catalog</Link>
+          <Link to="/projects" data-testid="nav-projects" className="hover:text-blue-700 transition-colors">Projects</Link>
           <Link to="/catalog?category=kits" data-testid="nav-kits" className="hover:text-blue-700 transition-colors">Kits</Link>
           <Link to="/catalog?category=microcontrollers" data-testid="nav-mcu" className="hover:text-blue-700 transition-colors">Boards</Link>
           <Link to="/catalog?featured=true" data-testid="nav-featured" className="hover:text-blue-700 transition-colors">Featured</Link>
@@ -98,6 +99,7 @@ export default function Header() {
       {mobileOpen && (
         <div className="lg:hidden border-t border-slate-200 bg-white px-6 py-4 space-y-3 font-mono-tech text-xs uppercase tracking-widest text-slate-700">
           <Link to="/catalog" onClick={() => setMobileOpen(false)} className="block hover:text-blue-700">Catalog</Link>
+          <Link to="/projects" onClick={() => setMobileOpen(false)} className="block hover:text-blue-700">Projects</Link>
           <Link to="/catalog?category=kits" onClick={() => setMobileOpen(false)} className="block hover:text-blue-700">Kits</Link>
           {user ? (
             <>

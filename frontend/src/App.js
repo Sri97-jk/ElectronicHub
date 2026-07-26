@@ -14,6 +14,8 @@ import Signup from "./pages/Signup";
 import Orders from "./pages/Orders";
 import Wishlist from "./pages/Wishlist";
 import Admin from "./pages/Admin";
+import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
 import "./App.css";
@@ -38,6 +40,8 @@ function App() {
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/wishlist" element={<Wishlist />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/projects/:slug" element={<ProjectDetail />} />
                 <Route path="/admin/*" element={<Admin />} />
               </Routes>
             </main>
