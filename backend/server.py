@@ -1026,7 +1026,7 @@ async def admin_update_project(slug: str, payload: dict, user=Depends(require_ad
 # --- Customer Support: Ask-a-question widget
 class SupportQuestionIn(BaseModel):
     product_id: Optional[str] = None
-    name: str
+    name: str = Field(min_length=1, max_length=100)
     email: EmailStr
     question: str = Field(min_length=5, max_length=2000)
 

@@ -22,6 +22,13 @@ Build ElectronicHub, a public e-commerce platform for electronic & robotics comp
 - **Robotics Team Lead** — small batches, saved lists, tracking
 - **Educator** — bundles, kits
 
+## Implemented (Phase 5 — 2026-07-26)
+- **Kit Assembly Guides**: admin can upload PDF wiring guides per project. New endpoint `PUT /api/admin/projects/{slug}` accepts `guide_url`; frontend `Admin → Projects` tab has upload UI; ProjectDetail page shows a "Download Assembly Guide" button when set.
+- **Abandoned Cart Nudges**: `AsyncIOScheduler` runs `check_abandoned_carts()` every 30 min. Finds users with cart items older than 24h whose `last_cart_reminder_at` is >7d ago, sends a branded reminder email via `send_abandoned_cart_reminder`, marks user reminded. Manual trigger: `POST /api/admin/trigger-abandoned-cart-scan`.
+- **Featured Project of the Week**: `GET /api/featured-project` (public) + `POST /api/admin/featured-project` (admin). Home page renders a full-width hero above the categories showing image, difficulty, duration, parts count, and total price with "Build This" CTA. Admin can flip the featured project from the new Projects tab.
+- **Customer Support Inbox**: `POST /api/support/question` (public, validates name/email/question) creates a ticket + emails all admins via Resend. `GET /api/admin/support` + `POST /api/admin/support/{id}/status` for admin management. Frontend adds an "Ask a Question" tab (data-testid=tab-qa) to every product page with a full form, plus a "Support" admin tab with the ticket list.
+- **Razorpay LIVE**: user pasted keys `rzp_test_TI6AFPUpVjNglm` / `m3DqgruGS6oNrga8Buhprt2n`. `/api/config/razorpay` returns enabled:true, /razorpay/order creates real Razorpay orders (e.g. `order_TI6HOxkBovdtWw`). Pay Now button on checkout opens the Razorpay Checkout modal.
+
 ## Implemented (Phase 4 — 2026-07-26)
 - **Razorpay payment gateway** integrated (replaces Stripe as primary for INR store). Endpoints:
   - `GET /api/config/razorpay` — public key + enabled flag for the frontend to decide whether to show the pay button
