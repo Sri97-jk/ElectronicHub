@@ -4,10 +4,28 @@ import { useCart } from "../lib/cart";
 import { useAuth } from "../lib/auth";
 import api from "../lib/api";
 import { toast } from "sonner";
-import { ArrowRight } from "@phosphor-icons/react";
+import { ArrowRight, ShieldCheck } from "@phosphor-icons/react";
+
+const RZP_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
+
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const existing = document.querySelector(`script[src="${RZP_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(true));
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = RZP_SCRIPT; s.async = true;
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
 
 export default function Checkout() {
-  const { items, subtotal } = useCart();
+  const { items, subtotal, refresh } = useCart();
   const { user } = useAuth();
   const nav = useNavigate();
   const [addr, setAddr] = useState({
@@ -17,10 +35,16 @@ export default function Checkout() {
   const [couponCode, setCouponCode] = useState("");
   const [coupon, setCoupon] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [rzpEnabled, setRzpEnabled] = useState(true);
 
   useEffect(() => {
     if (items.length === 0) nav("/cart");
   }, [items, nav]);
+
+  useEffect(() => {
+    api.get("/config/razorpay").then(r => setRzpEnabled(r.data.enabled)).catch(() => setRzpEnabled(false));
+    loadRazorpayScript();
+  }, []);
 
   const discount = coupon ? (coupon.discount_type === "percent" ? subtotal * (coupon.discount_value / 100) : coupon.discount_value) : 0;
   const shipping = subtotal >= 999 ? 0 : 79;
@@ -41,13 +65,58 @@ export default function Checkout() {
     for (const [k, v] of Object.entries(addr)) {
       if (!v && k !== "line2") return toast.error(`Please fill ${k.replace("_", " ")}`);
     }
+    if (!rzpEnabled) {
+      return toast.error("Razorpay is not configured. Ask the admin to add API keys.");
+    }
     setLoading(true);
     try {
-      const r = await api.post("/checkout/session", {
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded || !window.Razorpay) {
+        toast.error("Failed to load Razorpay. Check your internet connection.");
+        setLoading(false); return;
+      }
+      const r = await api.post("/razorpay/order", {
         origin_url: window.location.origin,
         address: addr, coupon_code: coupon?.code,
       });
-      window.location.href = r.data.checkout_url;
+      const opts = {
+        key: r.data.key_id,
+        amount: r.data.amount,
+        currency: r.data.currency,
+        name: "ElectronicHub",
+        description: `Order ${r.data.order_id.slice(0, 8).toUpperCase()}`,
+        image: "/logo.png",
+        order_id: r.data.razorpay_order_id,
+        prefill: r.data.prefill,
+        theme: { color: "#0F172A" },
+        notes: { internal_order_id: r.data.order_id },
+        handler: async (resp) => {
+          try {
+            await api.post("/razorpay/verify", {
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+            });
+            await refresh();
+            nav(`/payment/success?order_id=${r.data.order_id}`);
+          } catch (err) {
+            toast.error("Payment verification failed. Contact support.");
+            setLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            toast.info("Payment cancelled");
+            setLoading(false);
+          },
+        },
+      };
+      const rzp = new window.Razorpay(opts);
+      rzp.on("payment.failed", (r2) => {
+        toast.error(r2.error?.description || "Payment failed");
+        setLoading(false);
+      });
+      rzp.open();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Checkout failed");
       setLoading(false);
@@ -85,7 +154,7 @@ export default function Checkout() {
           </div>
         </div>
 
-        <aside className="border border-slate-200 p-6 self-start">
+        <aside className="border border-slate-200 p-6 self-start bg-white">
           <div className="section-label mb-4">Order Summary</div>
           <div className="max-h-64 overflow-y-auto space-y-3 mb-4">
             {items.map(it => (
@@ -95,7 +164,7 @@ export default function Checkout() {
                   <div className="text-slate-900 truncate">{it.product.name}</div>
                   <div className="text-slate-500 font-mono-tech text-xs">× {it.quantity}</div>
                 </div>
-                <div className="text-slate-900 font-mono-tech">₹{((it.product.discount_price || it.product.price) * it.quantity).toFixed(0)}</div>
+                <div className="text-slate-900 font-mono-tech font-semibold">₹{((it.product.discount_price || it.product.price) * it.quantity).toFixed(0)}</div>
               </div>
             ))}
           </div>
@@ -103,18 +172,27 @@ export default function Checkout() {
             <Row label="Subtotal" value={`₹${subtotal.toFixed(0)}`} />
             {discount > 0 && <Row label="Discount" value={`-₹${discount.toFixed(0)}`} accent />}
             <Row label="Shipping" value={shipping === 0 ? "FREE" : `₹${shipping}`} />
-            <Row label="Tax (18%)" value={`₹${tax.toFixed(0)}`} />
+            <Row label="Tax (18% GST)" value={`₹${tax.toFixed(0)}`} />
             <div className="flex justify-between text-slate-900 text-lg pt-3 border-t border-slate-200">
               <span>Total</span>
-              <span data-testid="checkout-total" className="text-blue-700">₹{total.toFixed(0)}</span>
+              <span data-testid="checkout-total" className="text-blue-700 font-semibold">₹{total.toFixed(0)}</span>
             </div>
           </div>
-          <button data-testid="pay-btn" onClick={submit} disabled={loading} className="btn-primary-neo w-full mt-6 flex items-center justify-center gap-2">
-            {loading ? "Redirecting…" : <>Pay Now <ArrowRight size={16} /></>}
+          <button data-testid="pay-btn" onClick={submit} disabled={loading || !rzpEnabled}
+            className="btn-primary-neo w-full mt-6 flex items-center justify-center gap-2">
+            {loading ? "Opening Razorpay…" : <>Pay Now <ArrowRight size={16} /></>}
           </button>
-          <p className="text-[10px] font-mono-tech text-slate-500 uppercase tracking-widest mt-4 text-center">
-            Secured by Stripe · Test card 4242 4242 4242 4242
-          </p>
+          {!rzpEnabled && (
+            <div className="mt-3 border border-orange-300 bg-orange-50 p-3 text-xs text-orange-800 leading-relaxed">
+              <b>Payments not configured yet.</b> The admin needs to add <code className="font-mono-tech">RAZORPAY_KEY_ID</code> and <code className="font-mono-tech">RAZORPAY_KEY_SECRET</code> to the backend <code>.env</code>.
+            </div>
+          )}
+          <div className="mt-4 flex items-center justify-center gap-2 text-[10px] font-mono-tech text-slate-500 uppercase tracking-widest">
+            <ShieldCheck size={12} /> Secured by Razorpay · UPI · Cards · Netbanking
+          </div>
+          <div className="mt-2 text-[10px] font-mono-tech text-slate-400 uppercase tracking-widest text-center">
+            Test card: 4111 1111 1111 1111 · any CVV · any future date
+          </div>
         </aside>
       </div>
     </div>
@@ -130,5 +208,5 @@ function Field({ label, value, onChange, className = "", testid }) {
   );
 }
 function Row({ label, value, accent }) {
-  return <div className="flex justify-between"><span className="text-slate-700">{label}</span><span className={accent ? "text-blue-700" : "text-slate-900"}>{value}</span></div>;
+  return <div className="flex justify-between"><span className="text-slate-500">{label}</span><span className={accent ? "text-blue-700" : "text-slate-900"}>{value}</span></div>;
 }

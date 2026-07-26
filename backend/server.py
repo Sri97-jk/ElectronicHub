@@ -4,12 +4,16 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
-import os, logging, uuid, bcrypt, jwt, requests, stripe
+import os, logging, uuid, bcrypt, jwt, requests, stripe, hmac, hashlib, json
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 from emails import send_order_confirmation, send_shipping_notification, send_delivered_notification
+try:
+    import razorpay
+except ImportError:
+    razorpay = None
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -31,6 +35,17 @@ try:
 except ImportError:
     StripeCheckout = None
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
+
+# Razorpay
+RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "").strip()
+RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "").strip()
+RAZORPAY_WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "").strip()
+_rzp = None
+if razorpay and RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
+    _rzp = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+    logging.info(f"Razorpay client initialized (key_id={RAZORPAY_KEY_ID[:12]}…)")
+else:
+    logging.info("Razorpay NOT configured — set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env")
 
 # --- DB
 async_client = AsyncIOMotorClient(mongo_url)
@@ -567,6 +582,164 @@ async def stripe_webhook(request: Request):
             )
     except Exception as e:
         logging.error(f"Webhook error: {e}")
+    return {"status": "ok"}
+
+# --- Razorpay (primary payment gateway for India / INR) ---
+@api_router.get("/config/razorpay")
+async def razorpay_config():
+    """Expose the public key id so the frontend can initialize the checkout modal."""
+    return {"key_id": RAZORPAY_KEY_ID, "enabled": _rzp is not None}
+
+
+@api_router.post("/razorpay/order")
+async def razorpay_create_order(data: CheckoutIn, user=Depends(get_optional_user), cart_id: Optional[str] = None):
+    """Create a Razorpay order from the current cart. Returns the order details
+    so the frontend can open the Razorpay Checkout modal."""
+    if not _rzp:
+        raise HTTPException(503, "Razorpay is not configured. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the server .env")
+    key = {"user_id": user["id"]} if user else {"cart_id": cart_id or ""}
+    items = await db.cart_items.find(key).to_list(200)
+    if not items:
+        raise HTTPException(400, "Cart is empty")
+    totals = await compute_cart_totals(items, data.coupon_code)
+    order_id = str(uuid.uuid4())
+    receipt = f"eh_{order_id[:8]}"
+    try:
+        rzp_order = _rzp.order.create({
+            "amount": int(round(totals["total"] * 100)),  # in paise
+            "currency": "INR",
+            "receipt": receipt,
+            "notes": {"internal_order_id": order_id, "user_id": user["id"] if user else "guest"},
+        })
+    except Exception as e:
+        logging.error(f"Razorpay order create failed: {e}")
+        raise HTTPException(502, f"Razorpay order failed: {e}")
+
+    order_doc = {
+        "id": order_id, "user_id": user["id"] if user else None,
+        "guest_email": None,
+        "status": "pending_payment", "payment_status": "pending",
+        "items": totals["line_items"],
+        "subtotal": totals["subtotal"], "discount": totals["discount"],
+        "shipping": totals["shipping"], "tax": totals["tax"],
+        "total": totals["total"], "currency": "INR",
+        "coupon": totals["coupon"]["code"] if totals["coupon"] else None,
+        "address": data.address.model_dump(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "tracking_number": None,
+        "gateway": "razorpay",
+        "razorpay_order_id": rzp_order["id"],
+    }
+    await db.orders.insert_one(order_doc)
+    await db.payment_transactions.insert_one({
+        "gateway": "razorpay",
+        "razorpay_order_id": rzp_order["id"],
+        "order_id": order_id,
+        "amount": totals["total"], "currency": "INR",
+        "status": "created", "payment_status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {
+        "razorpay_order_id": rzp_order["id"],
+        "amount": rzp_order["amount"],
+        "currency": rzp_order["currency"],
+        "key_id": RAZORPAY_KEY_ID,
+        "order_id": order_id,
+        "prefill": {
+            "name": data.address.full_name,
+            "email": (user or {}).get("email", ""),
+            "contact": data.address.phone,
+        },
+    }
+
+
+class RazorpayVerifyIn(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+async def _finalize_razorpay_order(rzp_order_id: str, rzp_payment_id: str):
+    """Mark order as paid, decrement stock, clear cart, send email. Idempotent."""
+    order = await db.orders.find_one({"razorpay_order_id": rzp_order_id})
+    if not order:
+        return None
+    if order.get("payment_status") == "paid":
+        return order
+    await db.payment_transactions.update_one(
+        {"razorpay_order_id": rzp_order_id},
+        {"$set": {"status": "completed", "payment_status": "paid",
+                  "razorpay_payment_id": rzp_payment_id,
+                  "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    await db.orders.update_one(
+        {"razorpay_order_id": rzp_order_id, "payment_status": {"$ne": "paid"}},
+        {"$set": {"payment_status": "paid", "status": "confirmed",
+                  "razorpay_payment_id": rzp_payment_id,
+                  "confirmed_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    # Decrement stock, clear cart, send email
+    for it in order["items"]:
+        await db.products.update_one({"id": it["product_id"]},
+            {"$inc": {"stock_qty": -it["quantity"]}})
+    if order.get("user_id"):
+        await db.cart_items.delete_many({"user_id": order["user_id"]})
+    if not order.get("email_sent"):
+        recipient = None
+        if order.get("user_id"):
+            u = await db.users.find_one({"id": order["user_id"]}, {"_id": 0, "email": 1})
+            if u: recipient = u.get("email")
+        recipient = recipient or order.get("guest_email")
+        if recipient:
+            try:
+                await send_order_confirmation(order, recipient)
+                await db.orders.update_one({"id": order["id"]},
+                    {"$set": {"email_sent": True}})
+            except Exception as e:
+                logging.error(f"Order confirmation email failed: {e}")
+    return await db.orders.find_one({"id": order["id"]}, {"_id": 0})
+
+
+@api_router.post("/razorpay/verify")
+async def razorpay_verify(data: RazorpayVerifyIn):
+    """Verify Razorpay payment signature and finalize the order."""
+    if not _rzp:
+        raise HTTPException(503, "Razorpay is not configured")
+    try:
+        _rzp.utility.verify_payment_signature({
+            "razorpay_order_id": data.razorpay_order_id,
+            "razorpay_payment_id": data.razorpay_payment_id,
+            "razorpay_signature": data.razorpay_signature,
+        })
+    except Exception as e:
+        logging.warning(f"Razorpay signature verification failed: {e}")
+        raise HTTPException(400, "Invalid payment signature")
+    order = await _finalize_razorpay_order(data.razorpay_order_id, data.razorpay_payment_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    return {"status": "success", "order_id": order["id"], "payment_status": order["payment_status"]}
+
+
+@app.post("/api/webhook/razorpay")
+async def razorpay_webhook(request: Request):
+    """Handle Razorpay server-to-server webhook events (payment.captured etc)."""
+    body = await request.body()
+    signature = request.headers.get("X-Razorpay-Signature", "")
+    if RAZORPAY_WEBHOOK_SECRET:
+        expected = hmac.new(RAZORPAY_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, signature):
+            logging.warning("Razorpay webhook signature mismatch")
+            raise HTTPException(400, "Invalid webhook signature")
+    try:
+        payload = json.loads(body.decode())
+        event = payload.get("event", "")
+        payment_entity = (payload.get("payload", {}).get("payment", {}) or {}).get("entity", {})
+        rzp_order_id = payment_entity.get("order_id")
+        rzp_payment_id = payment_entity.get("id")
+        if event == "payment.captured" and rzp_order_id and rzp_payment_id:
+            await _finalize_razorpay_order(rzp_order_id, rzp_payment_id)
+    except Exception as e:
+        logging.error(f"Razorpay webhook processing error: {e}")
     return {"status": "ok"}
 
 # --- Orders

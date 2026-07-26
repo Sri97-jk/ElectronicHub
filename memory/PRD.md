@@ -22,6 +22,16 @@ Build ElectronicHub, a public e-commerce platform for electronic & robotics comp
 - **Robotics Team Lead** — small batches, saved lists, tracking
 - **Educator** — bundles, kits
 
+## Implemented (Phase 4 — 2026-07-26)
+- **Razorpay payment gateway** integrated (replaces Stripe as primary for INR store). Endpoints:
+  - `GET /api/config/razorpay` — public key + enabled flag for the frontend to decide whether to show the pay button
+  - `POST /api/razorpay/order` — creates order in Razorpay + local orders collection with `gateway: razorpay`
+  - `POST /api/razorpay/verify` — verifies HMAC signature via `razorpay.Client.utility.verify_payment_signature`, marks order paid, decrements stock, clears cart, sends confirmation email
+  - `POST /api/webhook/razorpay` — HMAC-SHA256 signature-verified webhook for `payment.captured` events (idempotent)
+- Frontend Checkout page opens Razorpay Checkout modal (via `checkout.razorpay.com/v1/checkout.js`) with prefilled name/phone/email; handler calls `/verify` and routes to `/payment/success?order_id=…`.
+- Graceful fallback: if `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` are empty in `.env`, the `Pay Now` button disables and shows an orange banner explaining the missing keys.
+- Stripe endpoints remain in place for backward compatibility but are no longer wired to the UI.
+
 ## Implemented (Phase 3 — 2026-07-26)
 - **Project Kit Builder**: 4 seeded curated builds (Line Follower Robot, IoT Weather Station, Obstacle-Avoiding Robot, Motion-Alert Doorbell) each with parts list, difficulty tag, duration, and one-click "Add All To Cart". Endpoints: `GET /api/projects`, `GET /api/projects/{slug}`, `POST /api/projects/{slug}/add-to-cart`. Front-end pages `/projects` and `/projects/{slug}` + Home "Ready-to-build" section + header nav.
 - **Datasheet & Image Uploads**: admin product form now has real file inputs. `POST /api/uploads/image` (image/*) and `POST /api/uploads/datasheet` (application/pdf) both push into Emergent Object Storage and return `/api/files/{path}` URLs.
