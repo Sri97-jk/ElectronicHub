@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
+from emails import send_order_confirmation, send_shipping_notification, send_delivered_notification
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -338,6 +339,71 @@ async def cart_remove(product_id: str, user=Depends(get_optional_user), cart_id:
     await db.cart_items.delete_one(key)
     return {"ok": True}
 
+@api_router.get("/cart/recommendations")
+async def cart_recommendations(user=Depends(get_optional_user), cart_id: Optional[str] = None, limit: int = 6):
+    """Returns products that pair well with items currently in the cart.
+    Priority: (1) products in `compatible_with` tags of cart items,
+    (2) products sharing tags/category with cart items."""
+    key = {"user_id": user["id"]} if user else {"cart_id": cart_id or ""}
+    cart_items = await db.cart_items.find(key).to_list(200)
+    if not cart_items:
+        # If cart is empty, return featured products
+        featured = await db.products.find(
+            {"is_active": True, "is_featured": True}, {"_id": 0}
+        ).limit(limit).to_list(limit)
+        return {"items": featured, "reason": "featured"}
+    cart_product_ids = [it["product_id"] for it in cart_items]
+    cart_products = await db.products.find(
+        {"id": {"$in": cart_product_ids}}, {"_id": 0}
+    ).to_list(len(cart_product_ids))
+    # Collect compatibility hints from cart products
+    compat_names = set()
+    cats = set()
+    tags = set()
+    for p in cart_products:
+        for c in (p.get("compatible_with") or []):
+            compat_names.add(c)
+        if p.get("category"): cats.add(p["category"])
+        for t in (p.get("tags") or []):
+            tags.add(t)
+    # Score products: name-match on compatible_with, then shared tags, then shared category
+    query = {
+        "id": {"$nin": cart_product_ids},
+        "is_active": True,
+        "stock_qty": {"$gt": 0},
+    }
+    candidates = await db.products.find(query, {"_id": 0}).to_list(200)
+    scored = []
+    for c in candidates:
+        score = 0
+        # If the candidate's name/sku matches one of the compatibility strings from cart items
+        for cn in compat_names:
+            if cn.lower() in (c.get("name", "") + " " + c.get("brand", "")).lower():
+                score += 5
+        # Or if the candidate's own compatible_with references any cart product name
+        for cp in cart_products:
+            for cn in (c.get("compatible_with") or []):
+                if cn.lower() in cp.get("name", "").lower():
+                    score += 5
+        # Shared tags
+        shared_tags = tags.intersection(set(c.get("tags") or []))
+        score += len(shared_tags) * 2
+        # Same category, different item
+        if c.get("category") in cats:
+            score += 1
+        if score > 0:
+            scored.append((score, c))
+    scored.sort(key=lambda x: -x[0])
+    picks = [c for _, c in scored[:limit]]
+    if len(picks) < limit:
+        # Backfill with featured products from same categories
+        fill = await db.products.find(
+            {"category": {"$in": list(cats)}, "id": {"$nin": cart_product_ids + [p["id"] for p in picks]},
+             "is_active": True}, {"_id": 0}
+        ).limit(limit - len(picks)).to_list(limit - len(picks))
+        picks.extend(fill)
+    return {"items": picks[:limit], "reason": "compatible"}
+
 # --- Coupons
 @api_router.post("/coupons/validate")
 async def validate_coupon(payload: dict):
@@ -461,7 +527,21 @@ async def payment_status(session_id: str):
                             {"$inc": {"stock_qty": -it["quantity"]}})
                     if order.get("user_id"):
                         await db.cart_items.delete_many({"user_id": order["user_id"]})
-                rec = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+                    # Send order confirmation email
+                    if not order.get("email_sent"):
+                        recipient = None
+                        if order.get("user_id"):
+                            u = await db.users.find_one({"id": order["user_id"]}, {"_id": 0, "email": 1})
+                            if u: recipient = u.get("email")
+                        recipient = recipient or order.get("guest_email")
+                        if recipient:
+                            try:
+                                await send_order_confirmation(order, recipient)
+                                await db.orders.update_one({"id": order["id"]},
+                                    {"$set": {"email_sent": True}})
+                            except Exception as e:
+                                logging.error(f"Order confirmation email failed: {e}")
+                    rec = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
         except Exception as e:
             logging.error(f"Status check error: {e}")
     return {"session_id": rec["session_id"], "status": rec["status"],
@@ -598,6 +678,21 @@ async def admin_update_order(order_id: str, payload: dict, user=Depends(require_
     upd = {"status": status}
     if tracking: upd["tracking_number"] = tracking
     await db.orders.update_one({"id": order_id}, {"$set": upd})
+    # Send shipping/delivery notification email on status transition
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if order and order.get("user_id"):
+        u = await db.users.find_one({"id": order["user_id"]}, {"_id": 0, "email": 1})
+        recipient = u.get("email") if u else None
+        if recipient:
+            try:
+                if status == "shipped" and not order.get("shipped_email_sent"):
+                    await send_shipping_notification(order, recipient)
+                    await db.orders.update_one({"id": order_id}, {"$set": {"shipped_email_sent": True}})
+                elif status == "delivered" and not order.get("delivered_email_sent"):
+                    await send_delivered_notification(order, recipient)
+                    await db.orders.update_one({"id": order_id}, {"$set": {"delivered_email_sent": True}})
+            except Exception as e:
+                logging.error(f"Order status email failed: {e}")
     return {"ok": True}
 
 @api_router.post("/admin/coupons")

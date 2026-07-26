@@ -1,14 +1,24 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../lib/cart";
-import { Trash, ArrowRight } from "@phosphor-icons/react";
+import { Trash, ArrowRight, Lightning } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import api from "../lib/api";
+import ProductCard from "../components/ProductCard";
 
 export default function Cart() {
   const { items, subtotal, updateQty, removeItem } = useCart();
   const nav = useNavigate();
+  const [recs, setRecs] = useState({ items: [], reason: "featured" });
   const shipping = subtotal >= 999 ? 0 : (subtotal > 0 ? 79 : 0);
   const tax = subtotal * 0.18;
   const total = subtotal + shipping + tax;
+
+  useEffect(() => {
+    api.get("/cart/recommendations", { params: { limit: 4 } })
+      .then(r => setRecs(r.data))
+      .catch(() => setRecs({ items: [], reason: "featured" }));
+  }, [items.length]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
@@ -70,6 +80,26 @@ export default function Cart() {
             </p>
           </aside>
         </div>
+      )}
+
+      {/* COMPATIBILITY RECOMMENDER */}
+      {recs.items.length > 0 && (
+        <section className="mt-20" data-testid="cart-recommendations">
+          <div className="flex items-center gap-3 mb-3">
+            <Lightning size={16} weight="fill" className="text-[#00FF66]" />
+            <div className="section-label">
+              {recs.reason === "compatible" && items.length > 0 ? "Works with your cart" : "Popular this week"}
+            </div>
+          </div>
+          <h2 className="font-display text-3xl md:text-4xl text-white mb-8">
+            {recs.reason === "compatible" && items.length > 0
+              ? <>Complete your build <span className="text-[#00FF66]">.</span></>
+              : <>Add these to get started</>}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {recs.items.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
+          </div>
+        </section>
       )}
     </div>
   );
