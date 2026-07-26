@@ -23,53 +23,53 @@ export default function Cart() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
       <div className="section-label mb-3">Cart</div>
-      <h1 className="font-display text-4xl md:text-5xl text-white mb-10">Your Cart</h1>
+      <h1 className="font-display text-4xl md:text-5xl text-slate-900 mb-10">Your Cart</h1>
 
       {items.length === 0 ? (
-        <div className="border border-white/10 p-16 text-center">
-          <p className="text-slate-400 mb-6">Your cart is empty.</p>
+        <div className="border border-slate-200 p-16 text-center">
+          <p className="text-slate-500 mb-6">Your cart is empty.</p>
           <Link to="/catalog" className="btn-primary-neo inline-flex items-center gap-2">
             Browse Catalog <ArrowRight size={16} />
           </Link>
         </div>
       ) : (
         <div className="grid lg:grid-cols-[1fr_360px] gap-10">
-          <div className="border border-white/10">
+          <div className="border border-slate-200">
             {items.map(it => {
               const p = it.product;
               const price = p.discount_price || p.price;
               return (
-                <div key={it.product_id} data-testid={`cart-item-${p.sku}`} className="flex gap-4 p-4 border-b border-white/5 last:border-b-0">
-                  <img src={p.images?.[0]} alt={p.name} className="w-24 h-24 object-cover border border-white/10" />
+                <div key={it.product_id} data-testid={`cart-item-${p.sku}`} className="flex gap-4 p-4 border-b border-slate-100 last:border-b-0">
+                  <img src={p.images?.[0]} alt={p.name} className="w-24 h-24 object-cover border border-slate-200" />
                   <div className="flex-1">
                     <div className="text-[10px] font-mono-tech text-slate-500 uppercase tracking-widest">{p.sku}</div>
-                    <Link to={`/product/${p.id}`} className="font-display text-lg text-white hover:text-[#00FF66]">{p.name}</Link>
-                    <div className="text-[#00FF66] font-mono-tech mt-1">₹{price.toLocaleString()}</div>
+                    <Link to={`/product/${p.id}`} className="font-display text-lg text-slate-900 hover:text-blue-700">{p.name}</Link>
+                    <div className="text-blue-700 font-mono-tech mt-1">₹{price.toLocaleString()}</div>
                     <div className="flex items-center gap-3 mt-3">
-                      <div className="flex border border-white/15">
-                        <button data-testid={`cart-decr-${p.sku}`} onClick={() => updateQty(p.id, it.quantity - 1)} className="w-8 h-8 text-white hover:bg-white/5">−</button>
-                        <div className="w-10 h-8 flex items-center justify-center font-mono-tech text-white border-x border-white/15">{it.quantity}</div>
-                        <button data-testid={`cart-incr-${p.sku}`} onClick={() => updateQty(p.id, it.quantity + 1)} className="w-8 h-8 text-white hover:bg-white/5">+</button>
+                      <div className="flex border border-slate-300">
+                        <button data-testid={`cart-decr-${p.sku}`} onClick={() => updateQty(p.id, it.quantity - 1)} className="w-8 h-8 text-slate-900 hover:bg-slate-50">−</button>
+                        <div className="w-10 h-8 flex items-center justify-center font-mono-tech text-slate-900 border-x border-slate-300">{it.quantity}</div>
+                        <button data-testid={`cart-incr-${p.sku}`} onClick={() => updateQty(p.id, it.quantity + 1)} className="w-8 h-8 text-slate-900 hover:bg-slate-50">+</button>
                       </div>
                       <button data-testid={`cart-remove-${p.sku}`} onClick={() => { removeItem(p.id); toast.success("Removed from cart"); }}
-                        className="text-slate-400 hover:text-red-400"><Trash size={18} /></button>
+                        className="text-slate-500 hover:text-red-400"><Trash size={18} /></button>
                     </div>
                   </div>
-                  <div className="font-display text-xl text-white">₹{(price * it.quantity).toLocaleString()}</div>
+                  <div className="font-display text-xl text-slate-900">₹{(price * it.quantity).toLocaleString()}</div>
                 </div>
               );
             })}
           </div>
 
-          <aside className="border border-white/10 p-6 self-start">
+          <aside className="border border-slate-200 p-6 self-start">
             <div className="section-label mb-4">Summary</div>
             <div className="space-y-3 font-mono-tech text-sm">
               <Row label="Subtotal" value={`₹${subtotal.toLocaleString()}`} />
               <Row label="Shipping" value={shipping === 0 ? "FREE" : `₹${shipping}`} />
               <Row label="Tax (18%)" value={`₹${tax.toFixed(0)}`} />
-              <div className="border-t border-white/10 pt-3 mt-3 flex justify-between text-white text-lg">
+              <div className="border-t border-slate-200 pt-3 mt-3 flex justify-between text-slate-900 text-lg">
                 <span>Total</span>
-                <span data-testid="cart-total" className="text-[#00FF66]">₹{total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                <span data-testid="cart-total" className="text-blue-700">₹{total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
             <button data-testid="checkout-btn" onClick={() => nav("/checkout")} className="btn-primary-neo w-full mt-6 flex items-center justify-center gap-2">
@@ -86,14 +86,14 @@ export default function Cart() {
       {recs.items.length > 0 && (
         <section className="mt-20" data-testid="cart-recommendations">
           <div className="flex items-center gap-3 mb-3">
-            <Lightning size={16} weight="fill" className="text-[#00FF66]" />
+            <Lightning size={16} weight="fill" className="text-blue-700" />
             <div className="section-label">
               {recs.reason === "compatible" && items.length > 0 ? "Works with your cart" : "Popular this week"}
             </div>
           </div>
-          <h2 className="font-display text-3xl md:text-4xl text-white mb-8">
+          <h2 className="font-display text-3xl md:text-4xl text-slate-900 mb-8">
             {recs.reason === "compatible" && items.length > 0
-              ? <>Complete your build <span className="text-[#00FF66]">.</span></>
+              ? <>Complete your build <span className="text-blue-700">.</span></>
               : <>Add these to get started</>}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -105,5 +105,5 @@ export default function Cart() {
   );
 }
 function Row({ label, value }) {
-  return <div className="flex justify-between text-slate-300"><span>{label}</span><span>{value}</span></div>;
+  return <div className="flex justify-between text-slate-700"><span>{label}</span><span>{value}</span></div>;
 }

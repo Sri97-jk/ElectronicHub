@@ -28,13 +28,13 @@ export default function ProductCard({ product, index = 0 }) {
       data-testid={`product-card-${product.sku}`}
     >
       <Link to={`/product/${product.id}`} className="block">
-        <div className="aspect-square bg-[#0A1017] border-b border-white/10 overflow-hidden relative">
+        <div className="aspect-square bg-slate-50 border-b border-slate-200 overflow-hidden relative">
           {product.images?.[0] && (
             <img src={product.images[0]} alt={product.name}
               className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-transform duration-500" />
           )}
           {hasDiscount && (
-            <div className="absolute top-3 left-3 bg-[#00FF66] text-black px-2 py-1 font-mono-tech text-[10px] uppercase tracking-widest font-bold">
+            <div className="absolute top-3 left-3 bg-slate-900 text-white px-2 py-1 font-mono-tech text-[10px] uppercase tracking-widest font-bold">
               -{Math.round((1 - product.discount_price / product.price) * 100)}%
             </div>
           )}
@@ -48,7 +48,7 @@ export default function ProductCard({ product, index = 0 }) {
           <div className="text-[10px] font-mono-tech text-slate-500 uppercase tracking-widest mb-2">
             {product.sku} · {product.brand || "Generic"}
           </div>
-          <h3 className="font-display text-lg leading-tight text-white mb-3 line-clamp-2 group-hover:text-[#00FF66] transition-colors">
+          <h3 className="font-display text-lg leading-tight text-slate-900 mb-3 line-clamp-2 group-hover:text-blue-700 transition-colors">
             {product.name}
           </h3>
           <div className="flex items-center gap-2 mb-3">
@@ -56,7 +56,7 @@ export default function ProductCard({ product, index = 0 }) {
             {product.interface && <span className="tag-pill">{product.interface}</span>}
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="font-display text-2xl text-[#00FF66]">₹{price.toLocaleString()}</span>
+            <span className="font-display text-2xl text-blue-700">₹{price.toLocaleString()}</span>
             {hasDiscount && <span className="text-xs text-slate-500 line-through font-mono-tech">₹{product.price}</span>}
           </div>
         </div>

@@ -42,8 +42,8 @@ function App() {
               </Routes>
             </main>
             <Footer />
-            <Toaster theme="dark" position="top-right" toastOptions={{
-              style: { background: "#0A1017", border: "1px solid rgba(0,255,102,0.4)", color: "#fff", borderRadius: 0, fontFamily: "JetBrains Mono, monospace", fontSize: "12px" }
+            <Toaster theme="light" position="top-right" toastOptions={{
+              style: { background: "#FFFFFF", border: "1px solid #E5E7EB", color: "#0F172A", borderRadius: 2, fontFamily: "JetBrains Mono, monospace", fontSize: "12px", boxShadow: "0 4px 12px rgba(15,23,42,0.08)" }
             }} />
           </div>
         </BrowserRouter>

@@ -28,25 +28,25 @@ export default function Signup() {
   return (
     <div className="max-w-md mx-auto px-6 py-20 relative z-10">
       <div className="section-label mb-3">Register</div>
-      <h1 className="font-display text-4xl text-white mb-10">Create Account</h1>
-      <form onSubmit={submit} className="space-y-4 border border-white/10 p-8">
+      <h1 className="font-display text-4xl text-slate-900 mb-10">Create Account</h1>
+      <form onSubmit={submit} className="space-y-4 border border-slate-200 p-8">
         <div>
-          <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-400 mb-1">Name</label>
+          <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-500 mb-1">Name</label>
           <input data-testid="signup-name" value={name} onChange={e => setName(e.target.value)} required className="w-full px-3 py-2" />
         </div>
         <div>
-          <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-400 mb-1">Email</label>
+          <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-500 mb-1">Email</label>
           <input data-testid="signup-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full px-3 py-2" />
         </div>
         <div>
-          <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-400 mb-1">Password</label>
+          <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-500 mb-1">Password</label>
           <input data-testid="signup-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full px-3 py-2" />
         </div>
         <button data-testid="signup-submit" type="submit" disabled={loading} className="btn-primary-neo w-full">
           {loading ? "Creating…" : "Create Account"}
         </button>
-        <p className="text-center text-sm text-slate-400 pt-4">
-          Already registered? <Link to="/login" className="text-[#00FF66]">Log in</Link>
+        <p className="text-center text-sm text-slate-500 pt-4">
+          Already registered? <Link to="/login" className="text-blue-700">Log in</Link>
         </p>
       </form>
     </div>

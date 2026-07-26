@@ -50,11 +50,11 @@ export default function Catalog() {
       <div className="mb-10">
         <div className="section-label mb-3">Catalog</div>
         <div className="flex items-end justify-between flex-wrap gap-4">
-          <h1 className="font-display text-4xl md:text-5xl text-white">
+          <h1 className="font-display text-4xl md:text-5xl text-slate-900">
             {search ? `"${search}"` : category ? category.charAt(0).toUpperCase() + category.slice(1) : featured ? "Featured" : "All Products"}
           </h1>
           <div className="flex items-center gap-3">
-            <span className="font-mono-tech text-xs uppercase tracking-widest text-slate-400">{total} results</span>
+            <span className="font-mono-tech text-xs uppercase tracking-widest text-slate-500">{total} results</span>
             <select data-testid="sort-select" value={sort} onChange={(e) => setParam("sort", e.target.value)}
               className="text-xs font-mono-tech uppercase px-3 py-2">
               <option value="newest">Newest</option>
@@ -72,7 +72,7 @@ export default function Catalog() {
       <div className="grid lg:grid-cols-[240px_1fr] gap-8">
         <aside className={`${showFilters ? "block" : "hidden"} lg:block space-y-6`}>
           {(brand || voltage || iface || category || featured) && (
-            <button onClick={clearAll} className="text-xs font-mono-tech uppercase text-[#00FF66] flex items-center gap-1">
+            <button onClick={clearAll} className="text-xs font-mono-tech uppercase text-blue-700 flex items-center gap-1">
               <X size={12} /> Clear all filters
             </button>
           )}
@@ -87,8 +87,8 @@ export default function Catalog() {
               {[...Array(6)].map((_, i) => <div key={i} className="aspect-[3/4] tech-card animate-pulse" />)}
             </div>
           ) : products.length === 0 ? (
-            <div className="border border-white/10 p-16 text-center">
-              <p className="text-slate-400">No products match your filters.</p>
+            <div className="border border-slate-200 p-16 text-center">
+              <p className="text-slate-500">No products match your filters.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -109,7 +109,7 @@ function FilterGroup({ title, options, active, onSelect, testid }) {
       <div className="space-y-2">
         {options.map(o => (
           <button key={o} data-testid={`filter-${testid}-${o}`} onClick={() => onSelect(active === o ? "" : o)}
-            className={`block text-sm font-mono-tech text-left w-full py-1 transition-colors ${active === o ? "text-[#00FF66]" : "text-slate-400 hover:text-white"}`}>
+            className={`block text-sm font-mono-tech text-left w-full py-1 transition-colors ${active === o ? "text-blue-700" : "text-slate-500 hover:text-slate-900"}`}>
             <span className="mr-2">{active === o ? "▪" : "□"}</span> {o}
           </button>
         ))}

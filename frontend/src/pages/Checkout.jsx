@@ -57,11 +57,11 @@ export default function Checkout() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-12 relative z-10">
       <div className="section-label mb-3">Checkout</div>
-      <h1 className="font-display text-4xl md:text-5xl text-white mb-10">Shipping & Payment</h1>
+      <h1 className="font-display text-4xl md:text-5xl text-slate-900 mb-10">Shipping & Payment</h1>
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-10">
         <div className="space-y-6">
-          <div className="border border-white/10 p-6">
+          <div className="border border-slate-200 p-6">
             <div className="section-label mb-4">01 · Shipping Address</div>
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Full Name" testid="ck-name" value={addr.full_name} onChange={v => setAddr({...addr, full_name: v})} />
@@ -75,38 +75,38 @@ export default function Checkout() {
             </div>
           </div>
 
-          <div className="border border-white/10 p-6">
+          <div className="border border-slate-200 p-6">
             <div className="section-label mb-4">02 · Coupon</div>
             <div className="flex gap-3">
               <input data-testid="coupon-input" value={couponCode} onChange={e => setCouponCode(e.target.value)} placeholder="Try WELCOME10 or MAKER100" className="flex-1 px-3 py-2 text-sm" />
               <button data-testid="apply-coupon" onClick={applyCoupon} className="btn-ghost-neo">Apply</button>
             </div>
-            {coupon && <div className="mt-3 text-[#00FF66] font-mono-tech text-xs uppercase">✓ {coupon.code} applied</div>}
+            {coupon && <div className="mt-3 text-blue-700 font-mono-tech text-xs uppercase">✓ {coupon.code} applied</div>}
           </div>
         </div>
 
-        <aside className="border border-white/10 p-6 self-start">
+        <aside className="border border-slate-200 p-6 self-start">
           <div className="section-label mb-4">Order Summary</div>
           <div className="max-h-64 overflow-y-auto space-y-3 mb-4">
             {items.map(it => (
               <div key={it.product_id} className="flex gap-3 text-sm">
-                <img src={it.product.images?.[0]} alt="" className="w-12 h-12 object-cover border border-white/10" />
+                <img src={it.product.images?.[0]} alt="" className="w-12 h-12 object-cover border border-slate-200" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-white truncate">{it.product.name}</div>
-                  <div className="text-slate-400 font-mono-tech text-xs">× {it.quantity}</div>
+                  <div className="text-slate-900 truncate">{it.product.name}</div>
+                  <div className="text-slate-500 font-mono-tech text-xs">× {it.quantity}</div>
                 </div>
-                <div className="text-white font-mono-tech">₹{((it.product.discount_price || it.product.price) * it.quantity).toFixed(0)}</div>
+                <div className="text-slate-900 font-mono-tech">₹{((it.product.discount_price || it.product.price) * it.quantity).toFixed(0)}</div>
               </div>
             ))}
           </div>
-          <div className="space-y-2 font-mono-tech text-sm border-t border-white/10 pt-4">
+          <div className="space-y-2 font-mono-tech text-sm border-t border-slate-200 pt-4">
             <Row label="Subtotal" value={`₹${subtotal.toFixed(0)}`} />
             {discount > 0 && <Row label="Discount" value={`-₹${discount.toFixed(0)}`} accent />}
             <Row label="Shipping" value={shipping === 0 ? "FREE" : `₹${shipping}`} />
             <Row label="Tax (18%)" value={`₹${tax.toFixed(0)}`} />
-            <div className="flex justify-between text-white text-lg pt-3 border-t border-white/10">
+            <div className="flex justify-between text-slate-900 text-lg pt-3 border-t border-slate-200">
               <span>Total</span>
-              <span data-testid="checkout-total" className="text-[#00FF66]">₹{total.toFixed(0)}</span>
+              <span data-testid="checkout-total" className="text-blue-700">₹{total.toFixed(0)}</span>
             </div>
           </div>
           <button data-testid="pay-btn" onClick={submit} disabled={loading} className="btn-primary-neo w-full mt-6 flex items-center justify-center gap-2">
@@ -124,11 +124,11 @@ export default function Checkout() {
 function Field({ label, value, onChange, className = "", testid }) {
   return (
     <div className={className}>
-      <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-400 mb-1">{label}</label>
+      <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-500 mb-1">{label}</label>
       <input data-testid={testid} value={value} onChange={e => onChange(e.target.value)} className="w-full px-3 py-2 text-sm" />
     </div>
   );
 }
 function Row({ label, value, accent }) {
-  return <div className="flex justify-between"><span className="text-slate-300">{label}</span><span className={accent ? "text-[#00FF66]" : "text-white"}>{value}</span></div>;
+  return <div className="flex justify-between"><span className="text-slate-700">{label}</span><span className={accent ? "text-blue-700" : "text-slate-900"}>{value}</span></div>;
 }

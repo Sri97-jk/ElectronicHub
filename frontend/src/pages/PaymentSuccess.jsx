@@ -36,17 +36,17 @@ export default function PaymentSuccess() {
     <div className="max-w-2xl mx-auto px-6 py-24 relative z-10 text-center">
       {status === "checking" && (
         <>
-          <div className="w-16 h-16 border-2 border-[#00FF66] border-t-transparent rounded-full animate-spin mx-auto mb-8" />
-          <h1 className="font-display text-3xl text-white mb-4">Confirming Payment…</h1>
-          <p className="text-slate-400">Please don't close this window.</p>
+          <div className="w-16 h-16 border-2 border-slate-900 border-t-transparent rounded-full animate-spin mx-auto mb-8" />
+          <h1 className="font-display text-3xl text-slate-900 mb-4">Confirming Payment…</h1>
+          <p className="text-slate-500">Please don't close this window.</p>
         </>
       )}
       {status === "paid" && (
         <>
-          <CheckCircle size={80} weight="duotone" className="text-[#00FF66] mx-auto mb-6" />
+          <CheckCircle size={80} weight="duotone" className="text-blue-700 mx-auto mb-6" />
           <div className="section-label mb-3 justify-center">Order Confirmed</div>
-          <h1 className="font-display text-4xl md:text-5xl text-white mb-4">Thank you!</h1>
-          <p className="text-slate-400 mb-8">Your order has been placed successfully. You'll receive tracking updates via email.</p>
+          <h1 className="font-display text-4xl md:text-5xl text-slate-900 mb-4">Thank you!</h1>
+          <p className="text-slate-500 mb-8">Your order has been placed successfully. You'll receive tracking updates via email.</p>
           <div className="flex justify-center gap-3">
             {orderId && <Link to={`/orders`} data-testid="view-order" className="btn-primary-neo">View Orders</Link>}
             <Link to="/catalog" className="btn-ghost-neo">Continue Shopping</Link>
@@ -56,8 +56,8 @@ export default function PaymentSuccess() {
       {(status === "timeout" || status === "error") && (
         <>
           <Warning size={80} weight="duotone" className="text-yellow-400 mx-auto mb-6" />
-          <h1 className="font-display text-3xl text-white mb-4">Payment Status Unclear</h1>
-          <p className="text-slate-400 mb-8">Check your orders page to verify.</p>
+          <h1 className="font-display text-3xl text-slate-900 mb-4">Payment Status Unclear</h1>
+          <p className="text-slate-500 mb-8">Check your orders page to verify.</p>
           <Link to="/orders" className="btn-primary-neo">Go to Orders</Link>
         </>
       )}

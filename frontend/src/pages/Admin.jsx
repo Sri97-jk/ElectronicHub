@@ -7,14 +7,14 @@ import { Gauge, Cube, ShoppingBag, Tag, Warning, ArrowUp, TrendUp } from "@phosp
 
 export default function Admin() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="p-8 text-slate-400">Loading…</div>;
+  if (loading) return <div className="p-8 text-slate-500">Loading…</div>;
   if (!user || user.role !== "admin") return <Navigate to="/login" replace />;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-10 relative z-10">
       <div className="section-label mb-3">Admin Panel</div>
-      <h1 className="font-display text-4xl md:text-5xl text-white mb-8">Command Center</h1>
-      <div className="flex gap-6 border-b border-white/10 mb-8 overflow-x-auto">
+      <h1 className="font-display text-4xl md:text-5xl text-slate-900 mb-8">Command Center</h1>
+      <div className="flex gap-6 border-b border-slate-200 mb-8 overflow-x-auto">
         {[
           ["", "Dashboard", Gauge],
           ["products", "Products", Cube],
@@ -22,7 +22,7 @@ export default function Admin() {
           ["coupons", "Coupons", Tag],
         ].map(([path, label, Icon]) => (
           <NavLink key={path} to={`/admin/${path}`} end
-            className={({isActive}) => `flex items-center gap-2 py-3 font-mono-tech text-xs uppercase tracking-widest transition-colors ${isActive ? "text-[#00FF66] border-b-2 border-[#00FF66]" : "text-slate-400 hover:text-white"}`}
+            className={({isActive}) => `flex items-center gap-2 py-3 font-mono-tech text-xs uppercase tracking-widest transition-colors ${isActive ? "text-blue-700 border-b-2 border-slate-900" : "text-slate-500 hover:text-slate-900"}`}
             data-testid={`admin-nav-${path || "dashboard"}`}>
             <Icon size={16} /> {label}
           </NavLink>
@@ -41,7 +41,7 @@ export default function Admin() {
 function Dashboard() {
   const [d, setD] = useState(null);
   useEffect(() => { api.get("/admin/dashboard").then(r => setD(r.data)); }, []);
-  if (!d) return <p className="text-slate-400">Loading…</p>;
+  if (!d) return <p className="text-slate-500">Loading…</p>;
   const stats = [
     ["Revenue", `₹${d.revenue.toLocaleString()}`, TrendUp],
     ["Orders", d.total_orders, ShoppingBag],
@@ -52,40 +52,40 @@ function Dashboard() {
     <div className="space-y-8">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {stats.map(([l, v, Icon]) => (
-          <div key={l} className="border border-white/10 p-6">
-            <Icon size={20} className="text-[#00FF66] mb-3" />
+          <div key={l} className="border border-slate-200 p-6">
+            <Icon size={20} className="text-blue-700 mb-3" />
             <div className="text-[10px] font-mono-tech text-slate-500 uppercase tracking-widest">{l}</div>
-            <div className="font-display text-3xl text-white mt-1">{v}</div>
+            <div className="font-display text-3xl text-slate-900 mt-1">{v}</div>
           </div>
         ))}
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="border border-white/10 p-6">
+        <div className="border border-slate-200 p-6">
           <div className="flex items-center gap-2 mb-4">
             <Warning size={16} className="text-yellow-400" />
             <div className="section-label">Low Stock</div>
           </div>
-          {d.low_stock.length === 0 ? <p className="text-slate-400 text-sm">All stocked.</p> : (
+          {d.low_stock.length === 0 ? <p className="text-slate-500 text-sm">All stocked.</p> : (
             <div className="space-y-2">
               {d.low_stock.map(p => (
-                <div key={p.id} className="flex justify-between text-sm border-b border-white/5 pb-2">
-                  <span className="text-white">{p.name}</span>
+                <div key={p.id} className="flex justify-between text-sm border-b border-slate-100 pb-2">
+                  <span className="text-slate-900">{p.name}</span>
                   <span className="font-mono-tech text-yellow-400">{p.stock_qty} left</span>
                 </div>
               ))}
             </div>
           )}
         </div>
-        <div className="border border-white/10 p-6">
+        <div className="border border-slate-200 p-6">
           <div className="section-label mb-4">Recent Orders</div>
-          {d.recent_orders.length === 0 ? <p className="text-slate-400 text-sm">No orders yet.</p> : (
+          {d.recent_orders.length === 0 ? <p className="text-slate-500 text-sm">No orders yet.</p> : (
             <div className="space-y-2">
               {d.recent_orders.slice(0, 5).map(o => (
-                <div key={o.id} className="flex justify-between text-sm border-b border-white/5 pb-2">
-                  <span className="text-white font-mono-tech text-xs">#{o.id.slice(0, 8)}</span>
-                  <span className="text-slate-400 text-xs">{o.status}</span>
-                  <span className="text-[#00FF66] font-mono-tech">₹{o.total.toFixed(0)}</span>
+                <div key={o.id} className="flex justify-between text-sm border-b border-slate-100 pb-2">
+                  <span className="text-slate-900 font-mono-tech text-xs">#{o.id.slice(0, 8)}</span>
+                  <span className="text-slate-500 text-xs">{o.status}</span>
+                  <span className="text-blue-700 font-mono-tech">₹{o.total.toFixed(0)}</span>
                 </div>
               ))}
             </div>
@@ -140,13 +140,13 @@ function AdminProducts() {
       </div>
 
       {showForm && (
-        <div className="border border-[#00FF66]/40 p-6 mb-6 bg-[#00FF66]/5">
+        <div className="border border-slate-300 p-6 mb-6 bg-blue-50">
           <div className="section-label mb-4">{editing ? "Edit" : "New"} Product</div>
           <div className="grid md:grid-cols-2 gap-4">
             <Inp l="SKU" v={form.sku} on={v=>setForm({...form,sku:v})} tid="p-sku" />
             <Inp l="Name" v={form.name} on={v=>setForm({...form,name:v})} tid="p-name" />
             <div>
-              <label className="block text-[10px] font-mono-tech uppercase text-slate-400 mb-1">Category</label>
+              <label className="block text-[10px] font-mono-tech uppercase text-slate-500 mb-1">Category</label>
               <select data-testid="p-category" value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="w-full px-3 py-2">
                 {["sensors","microcontrollers","processors","robotics","power","connectivity","tools","kits"].map(c=><option key={c}>{c}</option>)}
               </select>
@@ -159,11 +159,11 @@ function AdminProducts() {
             <Inp l="Interface" v={form.interface || ""} on={v=>setForm({...form,interface:v})} tid="p-interface" />
             <Inp l="Image URLs (comma separated)" v={form.images} on={v=>setForm({...form,images:v})} tid="p-images" cls="md:col-span-2" />
             <div className="md:col-span-2">
-              <label className="block text-[10px] font-mono-tech uppercase text-slate-400 mb-1">Description</label>
+              <label className="block text-[10px] font-mono-tech uppercase text-slate-500 mb-1">Description</label>
               <textarea data-testid="p-desc" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows={3} className="w-full px-3 py-2" />
             </div>
-            <label className="flex items-center gap-2 text-sm text-white"><input type="checkbox" checked={form.is_featured} onChange={e=>setForm({...form,is_featured:e.target.checked})} /> Featured</label>
-            <label className="flex items-center gap-2 text-sm text-white"><input type="checkbox" checked={form.is_active} onChange={e=>setForm({...form,is_active:e.target.checked})} /> Active</label>
+            <label className="flex items-center gap-2 text-sm text-slate-900"><input type="checkbox" checked={form.is_featured} onChange={e=>setForm({...form,is_featured:e.target.checked})} /> Featured</label>
+            <label className="flex items-center gap-2 text-sm text-slate-900"><input type="checkbox" checked={form.is_active} onChange={e=>setForm({...form,is_active:e.target.checked})} /> Active</label>
           </div>
           <div className="flex gap-3 mt-6">
             <button data-testid="save-product" onClick={save} className="btn-primary-neo">Save</button>
@@ -172,17 +172,17 @@ function AdminProducts() {
         </div>
       )}
 
-      <div className="border border-white/10">
+      <div className="border border-slate-200">
         {products.map(p => (
-          <div key={p.id} className="flex items-center gap-4 p-4 border-b border-white/5 last:border-b-0">
-            <img src={p.images?.[0]} className="w-12 h-12 object-cover border border-white/10" alt="" />
+          <div key={p.id} className="flex items-center gap-4 p-4 border-b border-slate-100 last:border-b-0">
+            <img src={p.images?.[0]} className="w-12 h-12 object-cover border border-slate-200" alt="" />
             <div className="flex-1 min-w-0">
               <div className="text-[10px] font-mono-tech text-slate-500 uppercase">{p.sku}</div>
-              <div className="text-white truncate">{p.name}</div>
+              <div className="text-slate-900 truncate">{p.name}</div>
             </div>
-            <div className="text-[#00FF66] font-mono-tech">₹{(p.discount_price || p.price).toFixed(0)}</div>
-            <div className="text-xs font-mono-tech text-slate-400 w-16 text-right">{p.stock_qty} in stock</div>
-            <button onClick={() => edit(p)} className="text-xs font-mono-tech text-slate-300 hover:text-[#00FF66]">EDIT</button>
+            <div className="text-blue-700 font-mono-tech">₹{(p.discount_price || p.price).toFixed(0)}</div>
+            <div className="text-xs font-mono-tech text-slate-500 w-16 text-right">{p.stock_qty} in stock</div>
+            <button onClick={() => edit(p)} className="text-xs font-mono-tech text-slate-700 hover:text-blue-700">EDIT</button>
             <button onClick={() => remove(p.id)} className="text-xs font-mono-tech text-red-400 hover:text-red-300">DEL</button>
           </div>
         ))}
@@ -206,11 +206,11 @@ function AdminOrders() {
       <div className="section-label mb-6">Orders ({orders.length})</div>
       <div className="space-y-3">
         {orders.map(o => (
-          <div key={o.id} className="border border-white/10 p-4">
+          <div key={o.id} className="border border-slate-200 p-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <div className="text-[10px] font-mono-tech text-slate-500 uppercase">#{o.id.slice(0, 8)} · {new Date(o.created_at).toLocaleString()}</div>
-                <div className="text-white">{o.address?.full_name} · {o.items.length} items · ₹{o.total.toFixed(0)}</div>
+                <div className="text-slate-900">{o.address?.full_name} · {o.items.length} items · ₹{o.total.toFixed(0)}</div>
               </div>
               <select value={o.status} onChange={e => updateStatus(o.id, e.target.value)} className="text-xs font-mono-tech uppercase px-2 py-1">
                 {["pending_payment","confirmed","shipped","delivered","cancelled"].map(s => <option key={s}>{s}</option>)}
@@ -238,12 +238,12 @@ function AdminCoupons() {
   };
   return (
     <div className="space-y-6">
-      <div className="border border-white/10 p-6">
+      <div className="border border-slate-200 p-6">
         <div className="section-label mb-4">New Coupon</div>
         <div className="grid md:grid-cols-3 gap-4">
           <Inp l="Code" v={form.code} on={v=>setForm({...form,code:v})} tid="c-code" />
           <div>
-            <label className="block text-[10px] font-mono-tech uppercase text-slate-400 mb-1">Type</label>
+            <label className="block text-[10px] font-mono-tech uppercase text-slate-500 mb-1">Type</label>
             <select value={form.discount_type} onChange={e=>setForm({...form,discount_type:e.target.value})} className="w-full px-3 py-2">
               <option value="percent">Percent (%)</option>
               <option value="flat">Flat (₹)</option>
@@ -255,12 +255,12 @@ function AdminCoupons() {
         </div>
         <button data-testid="save-coupon" onClick={save} className="btn-primary-neo mt-4">Create Coupon</button>
       </div>
-      <div className="border border-white/10">
+      <div className="border border-slate-200">
         {coupons.map(c => (
-          <div key={c.id} className="flex items-center gap-4 p-4 border-b border-white/5 last:border-b-0">
-            <span className="font-mono-tech text-[#00FF66] uppercase">{c.code}</span>
-            <span className="text-white">{c.discount_type === "percent" ? `${c.discount_value}%` : `₹${c.discount_value}`} off</span>
-            <span className="text-slate-400 text-xs font-mono-tech ml-auto">Min ₹{c.min_order} · Used {c.uses || 0}/{c.max_uses}</span>
+          <div key={c.id} className="flex items-center gap-4 p-4 border-b border-slate-100 last:border-b-0">
+            <span className="font-mono-tech text-blue-700 uppercase">{c.code}</span>
+            <span className="text-slate-900">{c.discount_type === "percent" ? `${c.discount_value}%` : `₹${c.discount_value}`} off</span>
+            <span className="text-slate-500 text-xs font-mono-tech ml-auto">Min ₹{c.min_order} · Used {c.uses || 0}/{c.max_uses}</span>
           </div>
         ))}
       </div>
@@ -271,7 +271,7 @@ function AdminCoupons() {
 function Inp({ l, v, on, type = "text", tid, cls = "" }) {
   return (
     <div className={cls}>
-      <label className="block text-[10px] font-mono-tech uppercase text-slate-400 mb-1">{l}</label>
+      <label className="block text-[10px] font-mono-tech uppercase text-slate-500 mb-1">{l}</label>
       <input data-testid={tid} type={type} value={v} onChange={e => on(e.target.value)} className="w-full px-3 py-2" />
     </div>
   );

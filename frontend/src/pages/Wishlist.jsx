@@ -10,10 +10,10 @@ export default function Wishlist() {
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
       <div className="section-label mb-3">Saved</div>
-      <h1 className="font-display text-4xl md:text-5xl text-white mb-10">Wishlist</h1>
+      <h1 className="font-display text-4xl md:text-5xl text-slate-900 mb-10">Wishlist</h1>
       {items.length === 0 ? (
-        <div className="border border-white/10 p-16 text-center">
-          <p className="text-slate-400 mb-6">No items saved yet.</p>
+        <div className="border border-slate-200 p-16 text-center">
+          <p className="text-slate-500 mb-6">No items saved yet.</p>
           <Link to="/catalog" className="btn-primary-neo inline-block">Browse Catalog</Link>
         </div>
       ) : (
