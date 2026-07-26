@@ -3,7 +3,12 @@ Sends transactional emails via Resend when RESEND_API_KEY is present,
 otherwise falls back to console-only mode (logs email body to backend logs).
 """
 import os, asyncio, logging
+from pathlib import Path
 from typing import Optional
+from dotenv import load_dotenv
+
+# Ensure env is loaded even if this module is imported before server sets it up
+load_dotenv(Path(__file__).parent / ".env")
 
 logger = logging.getLogger("emails")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
@@ -16,9 +21,11 @@ if RESEND_API_KEY:
         import resend as _resend_mod
         _resend_mod.api_key = RESEND_API_KEY
         _resend = _resend_mod
-        logger.info("Resend email provider active")
+        logger.info(f"Resend email provider ACTIVE · sender={SENDER_EMAIL}")
     except Exception as e:
         logger.warning(f"Resend init failed, falling back to console: {e}")
+else:
+    logger.info("Resend API key not set — running in CONSOLE mode")
 
 
 async def send_email(to: str, subject: str, html: str) -> dict:

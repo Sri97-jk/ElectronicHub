@@ -22,6 +22,12 @@ Build ElectronicHub, a public e-commerce platform for electronic & robotics comp
 - **Robotics Team Lead** — small batches, saved lists, tracking
 - **Educator** — bundles, kits
 
+## Implemented (Phase 3 — 2026-07-26)
+- **Project Kit Builder**: 4 seeded curated builds (Line Follower Robot, IoT Weather Station, Obstacle-Avoiding Robot, Motion-Alert Doorbell) each with parts list, difficulty tag, duration, and one-click "Add All To Cart". Endpoints: `GET /api/projects`, `GET /api/projects/{slug}`, `POST /api/projects/{slug}/add-to-cart`. Front-end pages `/projects` and `/projects/{slug}` + Home "Ready-to-build" section + header nav.
+- **Datasheet & Image Uploads**: admin product form now has real file inputs. `POST /api/uploads/image` (image/*) and `POST /api/uploads/datasheet` (application/pdf) both push into Emergent Object Storage and return `/api/files/{path}` URLs.
+- **Real Emails ON**: Resend live with `sk-emergent...` key; verified via server-side shipping status update → real inbox delivery (ID `98de374e-bb8b-45ae-85f5-929c6fb5e273`). `emails.py` now loads its own `.env` to avoid init-order bugs.
+- **Product imagery refresh**: all 17 seeded products swapped to component-appropriate photos.
+
 ## Implemented (Phase 2 — 2026-07-26)
 - **Transactional emails** (order confirmed, shipped, delivered) via Resend. Console-only mode active (RESEND_API_KEY empty in .env). Idempotent per-order flags: `email_sent`, `shipped_email_sent`, `delivered_email_sent`.
 - **Compatibility Recommender** — new endpoint `GET /api/cart/recommendations` that scores candidates using `compatible_with` tag matches, shared tags, and shared category. Cart page shows "Works with your cart / Complete your build" when items are present, falls back to "Popular this week" for empty carts.
