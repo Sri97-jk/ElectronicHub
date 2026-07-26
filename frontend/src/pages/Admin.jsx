@@ -3,7 +3,7 @@ import { NavLink, Routes, Route, Navigate } from "react-router-dom";
 import api from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { toast } from "sonner";
-import { Gauge, Cube, ShoppingBag, Tag, Warning, ArrowUp, TrendUp } from "@phosphor-icons/react";
+import { Gauge, Cube, ShoppingBag, Tag, Warning, ArrowUp, TrendUp, FilePdf, ChatCircleText, Star } from "@phosphor-icons/react";
 
 export default function Admin() {
   const { user, loading } = useAuth();
@@ -18,8 +18,10 @@ export default function Admin() {
         {[
           ["", "Dashboard", Gauge],
           ["products", "Products", Cube],
+          ["projects", "Projects", Star],
           ["orders", "Orders", ShoppingBag],
           ["coupons", "Coupons", Tag],
+          ["support", "Support", ChatCircleText],
         ].map(([path, label, Icon]) => (
           <NavLink key={path} to={`/admin/${path}`} end
             className={({isActive}) => `flex items-center gap-2 py-3 font-mono-tech text-xs uppercase tracking-widest transition-colors ${isActive ? "text-blue-700 border-b-2 border-slate-900" : "text-slate-500 hover:text-slate-900"}`}
@@ -31,8 +33,10 @@ export default function Admin() {
       <Routes>
         <Route index element={<Dashboard />} />
         <Route path="products" element={<AdminProducts />} />
+        <Route path="projects" element={<AdminProjects />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="coupons" element={<AdminCoupons />} />
+        <Route path="support" element={<AdminSupport />} />
       </Routes>
     </div>
   );
@@ -331,3 +335,112 @@ function Inp({ l, v, on, type = "text", tid, cls = "" }) {
     </div>
   );
 }
+
+function AdminProjects() {
+  const [projects, setProjects] = useState([]);
+  const [featuredSlug, setFeaturedSlug] = useState("");
+  const [uploading, setUploading] = useState(null);
+  const load = async () => {
+    const [p, f] = await Promise.all([api.get("/admin/projects"), api.get("/featured-project")]);
+    setProjects(p.data);
+    setFeaturedSlug(f.data.project?.slug || "");
+  };
+  useEffect(() => { load(); }, []);
+
+  const uploadGuide = async (slug, file) => {
+    if (!file) return;
+    setUploading(slug);
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const upload = await api.post("/uploads/datasheet", fd, { headers: { "Content-Type": "multipart/form-data" }});
+      await api.put(`/admin/projects/${slug}`, { guide_url: upload.data.url });
+      toast.success("Assembly guide uploaded");
+      load();
+    } catch (e) { toast.error("Upload failed"); }
+    setUploading(null);
+  };
+
+  const setFeatured = async (slug) => {
+    await api.post("/admin/featured-project", { slug });
+    toast.success(`Featured project → ${slug}`);
+    setFeaturedSlug(slug);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="section-label">Project Kits ({projects.length})</div>
+      <div className="border border-slate-200 divide-y divide-slate-100">
+        {projects.map(p => (
+          <div key={p.slug} className="p-4 flex flex-wrap items-center gap-4">
+            <img src={p.image} alt="" className="w-14 h-14 object-cover border border-slate-200" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-mono-tech text-slate-500 uppercase tracking-widest">{p.slug}</div>
+              <div className="text-slate-900">{p.name}</div>
+              <div className="text-xs text-slate-500 mt-1">
+                {p.parts?.length || 0} parts · {p.difficulty} · {p.duration}
+                {p.guide_url && <a href={p.guide_url} target="_blank" rel="noreferrer" className="text-blue-700 ml-2">✓ Guide attached</a>}
+              </div>
+            </div>
+            <label className="btn-ghost-neo cursor-pointer" style={{padding: "8px 14px"}} data-testid={`proj-guide-upload-${p.slug}`}>
+              {uploading === p.slug ? "Uploading…" : "Upload Guide PDF"}
+              <input type="file" accept="application/pdf" className="hidden"
+                onChange={e => uploadGuide(p.slug, e.target.files?.[0])} disabled={uploading === p.slug} />
+            </label>
+            <button data-testid={`set-featured-${p.slug}`} onClick={() => setFeatured(p.slug)}
+              className={`text-xs font-mono-tech uppercase tracking-widest px-3 py-2 border ${featuredSlug === p.slug ? "border-blue-700 text-blue-700 bg-blue-50" : "border-slate-200 text-slate-500 hover:text-slate-900"}`}>
+              {featuredSlug === p.slug ? "★ Featured" : "Feature"}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminSupport() {
+  const [tickets, setTickets] = useState([]);
+  const load = () => api.get("/admin/support").then(r => setTickets(r.data));
+  useEffect(() => { load(); }, []);
+  const close = async (id) => {
+    await api.post(`/admin/support/${id}/status`, { status: "closed" });
+    toast.success("Marked closed"); load();
+  };
+  return (
+    <div>
+      <div className="section-label mb-4">Support Inbox ({tickets.filter(t => t.status === "open").length} open)</div>
+      {tickets.length === 0 ? (
+        <div className="border border-slate-200 p-16 text-center text-slate-500">
+          No customer questions yet.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {tickets.map(t => (
+            <div key={t.id} className="border border-slate-200 p-5" data-testid={`ticket-${t.id.slice(0, 8)}`}>
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <div className="text-[10px] font-mono-tech text-slate-500 uppercase tracking-widest">
+                    #{t.id.slice(0, 8).toUpperCase()} · {new Date(t.created_at).toLocaleString()} · {t.product_name || "General"}
+                  </div>
+                  <div className="text-slate-900 mt-1">
+                    <b>{t.name}</b> · <a href={`mailto:${t.email}`} className="text-blue-700">{t.email}</a>
+                  </div>
+                </div>
+                <span className={`tag-pill ${t.status === "open" ? "" : ""}`}
+                  style={t.status === "open" ? {color: "#C2410C", borderColor: "#EA580C", background: "#FFF7ED"} : {}}>
+                  {t.status}
+                </span>
+              </div>
+              <p className="text-slate-700 text-sm whitespace-pre-wrap">{t.question}</p>
+              {t.status === "open" && (
+                <button onClick={() => close(t.id)} className="mt-3 text-xs font-mono-tech uppercase text-blue-700 hover:text-slate-900">
+                  Mark Closed →
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+

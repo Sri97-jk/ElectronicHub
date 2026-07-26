@@ -139,3 +139,54 @@ async def send_delivered_notification(order: dict, recipient: str):
       <p style="color:#475569;font-size:13px;">If anything is wrong with your order, reply to this email and we'll make it right.</p>
     """
     return await send_email(recipient, f"Delivered · #{short_id}", _wrap(inner))
+
+
+async def send_abandoned_cart_reminder(items: list, subtotal: float, recipient: str, site_url: str = ""):
+    rows = ""
+    for it in items[:5]:
+        p = it.get("product") or {}
+        price = p.get("discount_price") or p.get("price", 0)
+        rows += f"""<tr>
+          <td style="padding:12px 0;border-bottom:1px solid #F1F5F9;">
+            <table><tr>
+              <td width="60"><img src="{(p.get('images') or [''])[0]}" width="60" height="60" style="object-fit:cover;border:1px solid #E5E7EB;" /></td>
+              <td style="padding-left:12px;">
+                <div style="color:#0F172A;font-size:14px;">{p.get('name','')}</div>
+                <div style="color:#64748B;font-family:'JetBrains Mono',monospace;font-size:11px;">× {it.get('quantity',1)} · ₹{price:.0f}</div>
+              </td>
+            </tr></table>
+          </td>
+        </tr>"""
+    inner = f"""
+      <h1 style="font-family:'Cabinet Grotesk','Inter',sans-serif;font-size:28px;font-weight:900;margin:0 0 8px;letter-spacing:-0.02em;color:#0F172A;">
+        Still building? <span style="color:#1E40AF;">→</span>
+      </h1>
+      <p style="color:#475569;margin:0 0 24px;">Your cart's waiting for you at ElectronicHub. We saved <b style="color:#0F172A;">₹{subtotal:.0f}</b> worth of parts so you don't have to hunt them down again.</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">{rows}</table>
+      <p style="text-align:center;margin:24px 0;">
+        <a href="{site_url}/cart" style="display:inline-block;background:#0F172A;color:#FFFFFF;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;font-weight:600;padding:14px 28px;text-decoration:none;">Finish Your Build →</a>
+      </p>
+      <p style="color:#94A3B8;font-size:12px;text-align:center;">Not interested? Just ignore this — we won't send another reminder.</p>
+    """
+    return await send_email(recipient, "Your ElectronicHub cart is waiting", _wrap(inner))
+
+
+async def send_support_question_to_admin(question: dict, admin_email: str, product_name: str = ""):
+    inner = f"""
+      <h1 style="font-family:'Cabinet Grotesk','Inter',sans-serif;font-size:24px;font-weight:900;margin:0 0 8px;letter-spacing:-0.02em;color:#0F172A;">
+        New question from a shopper
+      </h1>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.25em;color:#64748B;text-transform:uppercase;margin-bottom:16px;">
+        {product_name or 'General inquiry'}
+      </div>
+      <div style="border:1px solid #E5E7EB;padding:16px;margin-bottom:16px;background:#F8FAFC;">
+        <div style="color:#0F172A;font-size:14px;white-space:pre-wrap;">{question.get('question','')}</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#475569;line-height:1.8;">
+        From: <b style="color:#0F172A;">{question.get('name','—')}</b><br>
+        Email: <a href="mailto:{question.get('email','')}" style="color:#1E40AF;">{question.get('email','')}</a><br>
+        Ticket ID: {question.get('id','')[:8].upper()}
+      </div>
+      <p style="color:#475569;font-size:13px;margin-top:24px;">Reply directly to this email to answer the shopper.</p>
+    """
+    return await send_email(admin_email, f"[Support] {product_name or 'Question'}", _wrap(inner))

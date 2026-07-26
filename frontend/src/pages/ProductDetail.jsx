@@ -123,10 +123,10 @@ export default function ProductDetail() {
       {/* TABS */}
       <div className="mt-16 border-t border-slate-200">
         <div className="flex gap-8 border-b border-slate-200">
-          {["specs", "reviews"].map(t => (
+          {["specs", "reviews", "qa"].map(t => (
             <button key={t} data-testid={`tab-${t}`} onClick={() => setTab(t)}
               className={`py-4 font-mono-tech text-xs uppercase tracking-widest transition-colors ${tab === t ? "text-blue-700 border-b border-slate-900" : "text-slate-500"}`}>
-              {t === "specs" ? "Specifications" : `Reviews (${reviews.length})`}
+              {t === "specs" ? "Specifications" : t === "reviews" ? `Reviews (${reviews.length})` : "Ask a Question"}
             </button>
           ))}
         </div>
@@ -172,6 +172,8 @@ export default function ProductDetail() {
             ))}
           </div>
         )}
+
+        {tab === "qa" && <AskQuestion productId={product.id} defaultName={user?.name} defaultEmail={user?.email} />}
       </div>
 
       {/* RELATED */}
@@ -187,3 +189,63 @@ export default function ProductDetail() {
     </div>
   );
 }
+
+function AskQuestion({ productId, defaultName = "", defaultEmail = "" }) {
+  const [name, setName] = useState(defaultName || "");
+  const [email, setEmail] = useState(defaultEmail || "");
+  const [question, setQuestion] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim() || !email.trim() || question.trim().length < 5) {
+      toast.error("Please fill your name, email, and a question (5+ chars)");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post("/support/question", { product_id: productId, name, email, question });
+      setSubmitted(true);
+      toast.success("Question sent! We'll email you back.");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Failed to send");
+    } finally { setLoading(false); }
+  };
+
+  if (submitted) {
+    return (
+      <div className="mt-8 max-w-2xl border border-blue-200 bg-blue-50 p-8">
+        <div className="section-label mb-3">Thanks!</div>
+        <h3 className="font-display text-2xl text-slate-900 mb-2">Your question is on its way.</h3>
+        <p className="text-slate-700 text-sm">We'll reply to <b className="font-mono-tech">{email}</b> within 24 hours. Meanwhile, check out our other projects or the datasheet above for quick answers.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-8 max-w-2xl">
+      <div className="section-label mb-3">Ask the ElectronicHub team</div>
+      <p className="text-slate-500 text-sm mb-6">Not sure if this part fits your project? Need a pinout clarification? Send a note and we'll reply within 24 hours.</p>
+      <div className="border border-slate-200 p-6 space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-500 mb-1">Your Name</label>
+            <input data-testid="qa-name" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-500 mb-1">Email</label>
+            <input data-testid="qa-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] font-mono-tech uppercase tracking-widest text-slate-500 mb-1">Question</label>
+          <textarea data-testid="qa-question" rows={4} value={question} onChange={e => setQuestion(e.target.value)}
+            placeholder="e.g. Will this work with my ESP32 project running at 3.3V?" className="w-full px-3 py-2 text-sm" />
+        </div>
+        <button data-testid="qa-submit" onClick={submit} disabled={loading} className="btn-primary-neo">
+          {loading ? "Sending…" : "Send Question"}
+        </button>
+      </div>
+    </div>
+  );
+}
+

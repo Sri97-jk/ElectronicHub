@@ -15,11 +15,13 @@ export default function Home() {
   const [featured, setFeatured] = useState([]);
   const [cats, setCats] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [potw, setPotw] = useState(null);
 
   useEffect(() => {
     api.get("/products", { params: { featured: true, limit: 8 }}).then(r => setFeatured(r.data.items));
     api.get("/categories").then(r => setCats(r.data));
     api.get("/projects").then(r => setProjects(r.data.slice(0, 3))).catch(() => {});
+    api.get("/featured-project").then(r => setPotw(r.data.project)).catch(() => {});
   }, []);
 
   return (
@@ -58,8 +60,47 @@ export default function Home() {
         </div>
       </section>
 
+      {/* PROJECT OF THE WEEK HERO */}
+      {potw && (
+        <section className="max-w-7xl mx-auto px-6 pt-4 pb-16" data-testid="potw-section">
+          <motion.div initial={{opacity:0, y:16}} whileInView={{opacity:1, y:0}} viewport={{once:true}} transition={{duration:0.5}}>
+            <div className="border border-slate-200 bg-white overflow-hidden grid md:grid-cols-2 group">
+              <Link to={`/projects/${potw.slug}`} className="aspect-video md:aspect-auto md:min-h-[380px] bg-slate-50 overflow-hidden">
+                {potw.image && <img src={potw.image} alt={potw.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />}
+              </Link>
+              <div className="p-10 lg:p-14 flex flex-col justify-center">
+                <div className="section-label mb-4">Project of the Week</div>
+                <h2 className="font-display text-3xl lg:text-5xl text-slate-900 leading-tight mb-4">{potw.name}</h2>
+                <p className="text-slate-500 leading-relaxed mb-6">{potw.tagline}</p>
+                <div className="flex items-center gap-3 mb-8">
+                  <span className="tag-pill" style={{
+                    color: potw.difficulty === "Beginner" ? "#15803D" : potw.difficulty === "Intermediate" ? "#1D4ED8" : "#C2410C",
+                    borderColor: potw.difficulty === "Beginner" ? "#16A34A" : potw.difficulty === "Intermediate" ? "#1E40AF" : "#EA580C",
+                    background: potw.difficulty === "Beginner" ? "#F0FDF4" : potw.difficulty === "Intermediate" ? "#EFF6FF" : "#FFF7ED",
+                  }}>{potw.difficulty}</span>
+                  <span className="tag-pill">{potw.duration}</span>
+                  <span className="tag-pill">{potw.items?.length || 0} parts</span>
+                </div>
+                <div className="flex items-baseline gap-4 mb-8">
+                  <div>
+                    <div className="text-[10px] font-mono-tech text-slate-500 uppercase tracking-widest">Total parts cost</div>
+                    <div className="font-display text-4xl text-blue-700">₹{potw.total_price?.toLocaleString()}</div>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <Link to={`/projects/${potw.slug}`} data-testid="potw-cta" className="btn-primary-neo inline-flex items-center gap-2">
+                    Build This <ArrowRight size={16} />
+                  </Link>
+                  <Link to="/projects" className="btn-ghost-neo">All Projects</Link>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </section>
+      )}
+
       {/* CATEGORIES */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="max-w-7xl mx-auto px-6 py-16">
         <div className="flex items-end justify-between mb-10">
           <div>
             <div className="section-label mb-3">01 · Categories</div>

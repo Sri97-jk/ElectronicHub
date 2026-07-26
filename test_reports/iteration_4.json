@@ -1,0 +1,51 @@
+{
+  "summary": "Iteration 4 focus: Featured Project of the Week, Kit Assembly Guide (PDF upload + guide_url on project), Customer Support (Ask-a-Question widget + Admin inbox), Abandoned Cart scheduler. Added /app/backend/tests/test_iteration4_features.py with 17 new tests. Backend results: 64/67 passed across the full suite (55/58 excluding pre-existing flaky email tests + 1 new legit validation bug). New iteration4 suite: 15/17 passed. Verified: (a) GET /api/featured-project defaults to line-follower-robot with resolved items[] + total_price; POST /api/admin/featured-project with {slug:'weather-station'} flips the setting and subsequent GET returns weather-station; unauth request → 401, customer token → 403. (b) GET /api/admin/projects returns all 4 seeded projects (line-follower-robot, weather-station, obstacle-avoider, motion-alert-cam) — note seed slugs do NOT include 'electronics-shop-97' as review referenced; test falls back to motion-alert-cam. POST /api/uploads/datasheet (admin) returns {path,url} with /api/files/... prefix; PUT /api/admin/projects/{slug} with {guide_url:...} persists; GET /api/projects/{slug} exposes guide_url. (c) POST /api/support/question creates ticket, returns ticket_id, admin list sorted newest-first, POST /api/admin/support/{id}/status closes it (admin-only enforced). (d) POST /api/admin/trigger-abandoned-cart-scan returns {ok:true}; requires admin (customer → 403); after manually aging a cart_items doc created_at to (now-25h) via pymongo + clearing user.last_cart_reminder_at, first trigger sets user.last_cart_reminder_at (Resend actually sent — backend log shows '[EMAIL:RESEND] sent id=98de374e-... to=suraganithanusri@gmail.com'), second immediate trigger did NOT change the timestamp (7d cooldown honored). Regression: 47/50 previous tests still passing (2 pre-existing flaky tail-log tests from iter 3, unchanged). Frontend Playwright: home page renders data-testid='potw-section' with 'Build This' CTA linking to /projects/line-follower-robot; product detail Ask-a-Question tab (tab-qa) submits successfully and shows 'Thanks! Your question is on its way.' confirmation; admin /admin/projects tab shows all 4 projects with proj-guide-upload-<slug> + set-featured-<slug> testids for every slug; admin /admin/support tab renders Support Inbox with 4 Mark Closed buttons; project detail /projects/motion-alert-cam shows the assembly-guide-btn linking to the uploaded /api/files/.../*.pdf.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/support/question", "issue": "SupportQuestionIn.name has no min_length constraint — empty string ('') is accepted and returns 200 with a ticket. Review spec explicitly requires 422 for empty name. Fix: add Field(min_length=1) (or better min_length=2, strip whitespace) on the `name` field in SupportQuestionIn. Test test_submit_question_validation_empty_name is asserting the desired behavior and currently fails."},
+      {"endpoint": "emails.py (support tickets)", "issue": "Support-ticket notification emails to admin@electronichub.io fail with Resend 403 ('You can only send testing emails to your own email address') — expected on Resend free tier without a verified sender domain. The ticket is still created and errors are logged, so functionally OK, but flag for prod: verify a domain in Resend.com/domains and change SENDER_EMAIL from onboarding@resend.dev to a domain address before go-live, OR seed admin user email as suraganithanusri@gmail.com in non-prod."},
+      {"endpoint": "test_recommendations_and_emails.py", "issue": "Pre-existing flaky: test_shipped_email_console_log and test_delivered_email_console_log — before/after tail-log window mismatch (200 vs 250 lines) as noted in iter 3. DB flags shipped_email_sent/delivered_email_sent are correctly toggled; real idempotency is intact. Not a functional bug — carry-over from iter 3."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home — Project of the Week hero", "issues": ["Renders correctly; no issues found. Difficulty badge, part count, and total price all populate. CTA links correctly."]},
+      {"screen": "Product detail — Ask a Question", "issues": ["Success toast + inline 'Thanks!' confirmation both fire; form is clear and accessible."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration4_features.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_projects_and_uploads.py",
+    "/app/backend/tests/test_recommendations_and_emails.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "[HIGH] Add min_length=1 (or use constr(strip_whitespace=True, min_length=2)) on SupportQuestionIn.name in /app/backend/server.py so empty-name payloads return 422 as spec requires.",
+    "[MEDIUM] For prod: verify a domain in Resend + change SENDER_EMAIL — currently only suraganithanusri@gmail.com can receive Resend emails; admin support notifications silently fail (logged but ticket still created).",
+    "[LOW] Fix pre-existing flaky email idempotency tests (equal tail-log window sizes) — from iter 3.",
+    "[LOW/NIT] Review request references slug 'electronics-shop-97' for the guide-upload/feature-toggle tests, but the seeded projects use slugs {line-follower-robot, weather-station, obstacle-avoider, motion-alert-cam}. Either update the spec or add an 'electronics-shop-97' project to the seed. Tests work against actual seeded slugs."
+  ],
+  "critical_code_review_comments": [
+    "SupportQuestionIn has min_length=5 on question but NO validation on name (accepts empty) — spec violation.",
+    "check_abandoned_carts still does N+1 product lookups per cart item (line 1103: db.products.find_one per item). For a user with 10 items in cart × N eligible users this hits Mongo hard. Batch with $in over product_ids per user.",
+    "server.py is now 1428 lines (up from 1090 in iter 3). Split into routers is overdue — projects, support, featured-project, abandoned-cart, uploads, admin should each be their own module.",
+    "trigger-abandoned-cart-scan has no rate-limit — an authed admin (or a leaked admin token) could DoS Mongo + Resend by hammering it in a loop. Add either a per-caller cooldown or return a 429 if invoked <30s since last run.",
+    "admin_update_project (line 1017) whitelists {guide_url, is_active, sort_order, tagline, difficulty, duration, description, image} — but does NOT validate guide_url is a safe path/URL. A malicious admin could set guide_url='javascript:alert(1)' which the frontend then renders in an <a href>. Validate that guide_url matches ^/api/files/ or a whitelisted http(s) prefix.",
+    "Support tickets are stored with plain user-submitted email — no rate limiting on POST /api/support/question means an anonymous attacker can flood the DB and trigger arbitrary outbound Resend emails. Add a simple IP or captcha throttle.",
+    "abandoned-cart cooldown check uses ISO-string comparison (line 1095 `user['last_cart_reminder_at'] > cooldown`) — works because both are ISO 8601 UTC, but fragile if timezone offsets ever differ. Store as datetime BSON type."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration4_features.py (new)"
+  ],
+  "success_rate": {"backend": "96% (64/67 — 1 real validation bug + 2 pre-existing flaky)", "frontend": "100% (all iteration 4 UI flows verified)"},
+  "test_credentials": "Admin: admin@electronichub.io/Admin@12345 · Customer: suraganithanusri@gmail.com/Customer@12345 (note: /app/memory/test_credentials.md still says customer@electronichub.io — update memory file)",
+  "seed_data_creation": "Created support tickets with email='TEST_qa@example.com' (2 tickets, one closed via API in test); one test-uploaded PDF at /api/files/electronichub/datasheets/<uuid>.pdf; motion-alert-cam project now has guide_url set (persists — main agent may want to null it if they don't want a real PDF attached to seeded project).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests: /app/backend/tests/ has 4 test files, 67 tests total. Run: pytest /app/backend/tests/ -v. Iteration4 suite is self-contained and cleans up cart_items/last_cart_reminder_at at the end of test_eligibility_and_cooldown. If main agent adds min_length to SupportQuestionIn.name, expect 65/67 passing (only 2 pre-existing flaky remain). Resend is LIVE and only delivers to suraganithanusri@gmail.com; admin-notification emails will keep 403-ing until Resend domain is verified. Frontend potw-section, tab-qa, admin-nav-projects, admin-nav-support, proj-guide-upload-<slug>, set-featured-<slug>, assembly-guide-btn testids all wired and functional.",
+  "rca of the issue": "test_submit_question_validation_empty_name FAIL — RCA: /app/backend/server.py:1029 defines `name: str` on SupportQuestionIn with no constraint. Pydantic accepts an empty string as a valid str, so the request passes validation and inserts a ticket with name=''. Reproduction: POST /api/support/question {\"name\":\"\",\"email\":\"a@b.com\",\"question\":\"long enough question here\"} → 200 with ticket_id (should be 422). Fix: change to `name: str = Field(min_length=1)` or `name: constr(strip_whitespace=True, min_length=2)`."
+}

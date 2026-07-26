@@ -9,7 +9,14 @@ from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
-from emails import send_order_confirmation, send_shipping_notification, send_delivered_notification
+from emails import (
+    send_order_confirmation, send_shipping_notification, send_delivered_notification,
+    send_abandoned_cart_reminder, send_support_question_to_admin,
+)
+try:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+except ImportError:
+    AsyncIOScheduler = None
 try:
     import razorpay
 except ImportError:
@@ -973,6 +980,152 @@ async def add_project_to_cart(slug: str, user=Depends(get_optional_user), cart_i
     return {"added": added, "unavailable": unavailable, "cart_id": cart_id if not user else None}
 
 
+# --- Featured Project of the Week (public setting)
+@api_router.get("/featured-project")
+async def get_featured_project():
+    setting = await db.settings.find_one({"key": "featured_project_slug"}, {"_id": 0})
+    slug = (setting or {}).get("value")
+    if not slug:
+        # Fallback: highest priority active project
+        first = await db.projects.find_one({"is_active": True}, {"_id": 0}, sort=[("sort_order", 1)])
+        if not first:
+            return {"project": None}
+        slug = first["slug"]
+    proj = await db.projects.find_one({"slug": slug, "is_active": True}, {"_id": 0})
+    if not proj:
+        return {"project": None}
+    return {"project": await _resolve_project(proj)}
+
+
+@api_router.post("/admin/featured-project")
+async def set_featured_project(payload: dict, user=Depends(require_admin)):
+    slug = (payload.get("slug") or "").strip()
+    await db.settings.update_one(
+        {"key": "featured_project_slug"},
+        {"$set": {"value": slug, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {"ok": True, "slug": slug}
+
+
+# --- Admin: Projects (guide URL upload)
+@api_router.get("/admin/projects")
+async def admin_list_projects(user=Depends(require_admin)):
+    return await db.projects.find({}, {"_id": 0}).sort([("sort_order", 1)]).to_list(100)
+
+
+@api_router.put("/admin/projects/{slug}")
+async def admin_update_project(slug: str, payload: dict, user=Depends(require_admin)):
+    allowed = {k: v for k, v in payload.items() if k in {"guide_url", "is_active", "sort_order", "tagline", "difficulty", "duration", "description", "image"}}
+    if not allowed:
+        raise HTTPException(400, "No updatable fields provided")
+    await db.projects.update_one({"slug": slug}, {"$set": allowed})
+    return await db.projects.find_one({"slug": slug}, {"_id": 0})
+
+
+# --- Customer Support: Ask-a-question widget
+class SupportQuestionIn(BaseModel):
+    product_id: Optional[str] = None
+    name: str
+    email: EmailStr
+    question: str = Field(min_length=5, max_length=2000)
+
+
+@api_router.post("/support/question")
+async def submit_support_question(data: SupportQuestionIn):
+    ticket_id = str(uuid.uuid4())
+    product_name = ""
+    if data.product_id:
+        p = await db.products.find_one({"id": data.product_id}, {"_id": 0, "name": 1})
+        if p: product_name = p["name"]
+    doc = {
+        "id": ticket_id, "product_id": data.product_id, "product_name": product_name,
+        "name": data.name, "email": data.email, "question": data.question,
+        "status": "open", "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.support_tickets.insert_one(doc)
+    # Notify admin(s) via email
+    admins = await db.users.find({"role": "admin"}, {"_id": 0, "email": 1}).to_list(10)
+    for a in admins:
+        try:
+            await send_support_question_to_admin(doc, a["email"], product_name)
+        except Exception as e:
+            logging.error(f"Support email to admin failed: {e}")
+    return {"ok": True, "ticket_id": ticket_id}
+
+
+@api_router.get("/admin/support")
+async def admin_list_support(user=Depends(require_admin)):
+    tickets = await db.support_tickets.find({}, {"_id": 0}).sort([("created_at", -1)]).to_list(500)
+    return tickets
+
+
+@api_router.post("/admin/support/{ticket_id}/status")
+async def admin_update_support(ticket_id: str, payload: dict, user=Depends(require_admin)):
+    status = payload.get("status", "closed")
+    await db.support_tickets.update_one({"id": ticket_id}, {"$set": {"status": status}})
+    return {"ok": True}
+
+
+# --- Abandoned Cart Nudge (scheduled)
+_scheduler = None
+ABANDONED_CART_AFTER_HOURS = 24
+ABANDONED_CART_COOLDOWN_DAYS = 7  # don't email same cart within N days
+
+
+async def check_abandoned_carts():
+    """Find carts with items older than ABANDONED_CART_AFTER_HOURS whose user hasn't been reminded recently,
+    then email them and mark as reminded."""
+    now = datetime.now(timezone.utc)
+    threshold = (now - timedelta(hours=ABANDONED_CART_AFTER_HOURS)).isoformat()
+    cooldown = (now - timedelta(days=ABANDONED_CART_COOLDOWN_DAYS)).isoformat()
+    # Find users who have at least one cart item older than threshold
+    pipeline = [
+        {"$match": {"user_id": {"$exists": True, "$ne": None}, "created_at": {"$lte": threshold}}},
+        {"$group": {"_id": "$user_id", "oldest": {"$min": "$created_at"}}},
+    ]
+    aging_carts = await db.cart_items.aggregate(pipeline).to_list(1000)
+    sent = 0
+    for c in aging_carts:
+        user_id = c["_id"]
+        if not user_id: continue
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if not user: continue
+        # Skip if already reminded recently
+        if user.get("last_cart_reminder_at") and user["last_cart_reminder_at"] > cooldown:
+            continue
+        # Fetch current cart
+        items_raw = await db.cart_items.find({"user_id": user_id}).to_list(50)
+        if not items_raw: continue
+        items = []
+        subtotal = 0
+        for it in items_raw:
+            p = await db.products.find_one({"id": it["product_id"]}, {"_id": 0})
+            if not p: continue
+            price = p.get("discount_price") or p["price"]
+            subtotal += price * it["quantity"]
+            items.append({"quantity": it["quantity"], "product": p})
+        if not items: continue
+        site_url = os.environ.get("PUBLIC_SITE_URL", "").rstrip("/")
+        try:
+            await send_abandoned_cart_reminder(items, subtotal, user["email"], site_url)
+            await db.users.update_one({"id": user_id},
+                {"$set": {"last_cart_reminder_at": now.isoformat()}})
+            sent += 1
+            logging.info(f"Abandoned-cart reminder sent to {user['email']}")
+        except Exception as e:
+            logging.error(f"Abandoned-cart email to {user.get('email')} failed: {e}")
+    if sent:
+        logging.info(f"[Scheduler] Abandoned cart reminders sent: {sent}")
+
+
+@api_router.post("/admin/trigger-abandoned-cart-scan")
+async def trigger_abandoned_cart_scan(user=Depends(require_admin)):
+    """Manual trigger for the abandoned cart scheduler — useful for testing."""
+    await check_abandoned_carts()
+    return {"ok": True}
+
+
 async def seed_projects():
     if await db.projects.count_documents({}) > 0:
         return
@@ -1242,6 +1395,14 @@ async def startup():
         logging.warning(f"Storage init failed (uploads disabled): {e}")
     await seed_data()
     await seed_projects()
+    # Start abandoned-cart scheduler
+    global _scheduler
+    if AsyncIOScheduler and not _scheduler:
+        _scheduler = AsyncIOScheduler()
+        _scheduler.add_job(check_abandoned_carts, "interval", minutes=30,
+                           id="abandoned_cart_scan", replace_existing=True)
+        _scheduler.start()
+        logging.info("Abandoned-cart scheduler started (every 30 min)")
 
 @api_router.get("/")
 async def root():
@@ -1260,4 +1421,7 @@ logging.basicConfig(level=logging.INFO,
 
 @app.on_event("shutdown")
 async def shutdown():
+    global _scheduler
+    if _scheduler:
+        _scheduler.shutdown(wait=False)
     async_client.close()

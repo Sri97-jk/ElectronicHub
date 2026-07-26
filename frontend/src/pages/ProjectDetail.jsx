@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Package, Clock, Lightning, Sparkle, Check } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, Package, Clock, Lightning, Sparkle, Check, FilePdf } from "@phosphor-icons/react";
 import api from "../lib/api";
 import { useCart } from "../lib/cart";
 import { toast } from "sonner";
@@ -72,6 +72,14 @@ export default function ProjectDetail() {
                   ))}
                 </ul>
               </div>
+            )}
+
+            {project.guide_url && (
+              <a href={project.guide_url} target="_blank" rel="noreferrer"
+                 data-testid="assembly-guide-btn"
+                 className="btn-ghost-neo mt-8 inline-flex items-center gap-2">
+                <FilePdf size={16} weight="fill" className="text-blue-700" /> Download Assembly Guide
+              </a>
             )}
           </motion.div>
 
