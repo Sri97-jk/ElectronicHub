@@ -22,6 +22,10 @@ Build ElectronicHub, a public e-commerce platform for electronic & robotics comp
 - **Robotics Team Lead** — small batches, saved lists, tracking
 - **Educator** — bundles, kits
 
+## Implemented (Phase 2 — 2026-07-26)
+- **Transactional emails** (order confirmed, shipped, delivered) via Resend. Console-only mode active (RESEND_API_KEY empty in .env). Idempotent per-order flags: `email_sent`, `shipped_email_sent`, `delivered_email_sent`.
+- **Compatibility Recommender** — new endpoint `GET /api/cart/recommendations` that scores candidates using `compatible_with` tag matches, shared tags, and shared category. Cart page shows "Works with your cart / Complete your build" when items are present, falls back to "Popular this week" for empty carts.
+
 ## Implemented (Phase 1 MVP — 2026-07-26)
 ### Backend endpoints
 - Auth: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/auth/me`
